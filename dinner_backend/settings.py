@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'dashboard',
     'main'
 ]
 
@@ -140,3 +139,6 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
+
+LOGIN_URL = 'admin:login'  # Points to Django admin login
+LOGIN_REDIRECT_URL = 'admin_dashboard'

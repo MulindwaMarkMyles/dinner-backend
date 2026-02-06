@@ -75,11 +75,19 @@ class DrinkType(models.Model):
 
 
 class DrinkTransaction(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('denied', 'Denied'),
+    ]
+    
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='drink_transactions')
     drink_type = models.ForeignKey(DrinkType, on_delete=models.CASCADE, related_name='transactions')
     quantity = models.IntegerField(default=1)
     serving_point = models.CharField(max_length=100)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     served_at = models.DateTimeField(auto_now_add=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.full_name} - {self.drink_type.name} x{self.quantity} at {self.serving_point}"
+        return f"{self.user.full_name} - {self.drink_type.name} x{self.quantity} at {self.serving_point} [{self.status}]"

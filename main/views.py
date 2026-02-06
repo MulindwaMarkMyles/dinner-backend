@@ -181,8 +181,6 @@ def consume_drink(request):
     drink_name = request.data.get('drink_name')
     quantity = request.data.get('quantity', '1')
 
-    print(request.data)
-    
     if not first_name or not last_name or not gender:
         return Response({'error': 'first_name, last_name and gender are required'}, status=status.HTTP_400_BAD_REQUEST)
     
@@ -236,22 +234,7 @@ def consume_drink(request):
             'error': f'Insufficient allowance. Only {user.drinks_remaining} drinks remaining'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Deduct from user allowance
-    user.drinks_remaining -= quantity
-    user.save()
-    
-    # Deduct from drink inventory
-    drink_type.available_quantity -= quantity
-    drink_type.save()
-    
-    # Create meal log
-    meal_log = MealLog.objects.create(
-        user=user,
-        meal_type='drink',
-        serving_point=serving_point
-    )
-    
-    # Create drink transaction
+    # Create pending drink transaction (waiting for approval)
     transaction = DrinkTransaction.objects.create(
         user=user,
         drink_type=drink_type,
@@ -260,10 +243,11 @@ def consume_drink(request):
     )
     
     return Response({
+        'message': 'Drink order submitted for approval',
+        'status': 'pending',
         'user': UserSerializer(user).data,
         'transaction': DrinkTransactionSerializer(transaction).data,
-        'drink_stock_remaining': drink_type.available_quantity
-    }, status=status.HTTP_200_OK)
+    }, status=status.HTTP_202_ACCEPTED)
 
 @api_view(['GET'])
 def get_user_status(request):
