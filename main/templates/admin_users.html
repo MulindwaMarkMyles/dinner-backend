@@ -1,97 +1,152 @@
-{% extends 'admin_base.html' %}
-
-{% block title %}User Management{% endblock %}
-
+{% extends 'admin_base.html' %} {% block title %}User Management{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-	<h1 class="h2 mb-0">User Management</h1>
-	<span class="badge bg-dark">{{ users|length }} total users</span>
+    <h1 class="h2 mb-0">User Management</h1>
+    <span class="badge bg-dark">{{ users|length }} total users</span>
 </div>
 
 <div class="card">
-	<div class="card-body p-0">
-		<div class="table-responsive">
-			<table class="table table-hover mb-0">
-				<thead>
-					<tr>
-						<th>ID</th>
-						<th>Name</th>
-						<th>Gender</th>
-						<th>Lunches</th>
-						<th>Dinners</th>
-						<th>Drinks</th>
-						<th>Week Start</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					{% for user in users %}
-					<tr>
-						<td>#{{ user.id }}</td>
-						<td>{{ user.full_name }}</td>
-						<td>{{ user.get_gender_display }}</td>
-						<td><span class="badge-custom">{{ user.lunches_remaining }}/{{ user.WEEKLY_LUNCHES }}</span></td>
-						<td><span class="badge-custom">{{ user.dinners_remaining }}/{{ user.WEEKLY_DINNERS }}</span></td>
-						<td><span class="badge-custom">{{ user.drinks_remaining }}/{{ user.WEEKLY_DRINKS }}</span></td>
-						<td>{{ user.week_start|date:"M d, Y" }}</td>
-						<td>
-							<button class="btn btn-sm btn-outline-dark" onclick="editUser({{ user.id }}, {{ user.lunches_remaining }}, {{ user.dinners_remaining }}, {{ user.drinks_remaining }})">
-								<i class="bi bi-pencil"></i> Edit
-							</button>
-							<a href="{% url 'delete_user' user.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete {{ user.full_name }}?')">
-								<i class="bi bi-trash"></i>
-							</a>
-						</td>
-					</tr>
-					{% empty %}
-					<tr><td colspan="8" class="text-center text-muted py-4">No users found</td></tr>
-					{% endfor %}
-				</tbody>
-			</table>
-		</div>
-	</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Rotary Club</th>
+                        <th>Lunches</th>
+                        <th>Dinners</th>
+                        <th>Drinks</th>
+                        <th>Initial Scan Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>#{{ user.id }}</td>
+                        <td>{{ user.full_name }}</td>
+                        <td>{{ user.rotary_club }}</td>
+                        <td>
+                            <span class="badge-custom"
+                                >{{ user.lunches_remaining }}/{{
+                                user.WEEKLY_LUNCHES }}</span
+                            >
+                        </td>
+                        <td>
+                            <span class="badge-custom"
+                                >{{ user.dinners_remaining }}/{{
+                                user.WEEKLY_DINNERS }}</span
+                            >
+                        </td>
+                        <td>
+                            <span class="badge-custom"
+                                >{{ user.drinks_remaining }}/{{
+                                user.WEEKLY_DRINKS }}</span
+                            >
+                        </td>
+                        <td>{{ user.week_start|date:"M d, Y" }}</td>
+                        <td>
+                            <button
+                                class="btn btn-sm btn-outline-blue"
+                                onclick="editUser({{ user.id }}, {{ user.lunches_remaining }}, {{ user.dinners_remaining }}, {{ user.drinks_remaining }})"
+                            >
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <a
+                                href="{% url 'delete_user' user.id %}"
+                                class="btn btn-sm btn-outline-danger"
+                                onclick="return confirm('Delete {{ user.full_name }}?')"
+                            >
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No users found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <!-- Edit User Modal -->
 <div class="modal fade" id="editUserModal" tabindex="-1">
-	<div class="modal-dialog">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title">Edit User Allowances</h5>
-				<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-			</div>
-			<form method="post" id="editUserForm">
-				{% csrf_token %}
-				<div class="modal-body">
-					<div class="mb-3">
-						<label class="form-label">Lunches Remaining</label>
-						<input type="number" name="lunches" id="editLunches" class="form-control" min="0" required>
-					</div>
-					<div class="mb-3">
-						<label class="form-label">Dinners Remaining</label>
-						<input type="number" name="dinners" id="editDinners" class="form-control" min="0" required>
-					</div>
-					<div class="mb-3">
-						<label class="form-label">Drinks Remaining</label>
-						<input type="number" name="drinks" id="editDrinks" class="form-control" min="0" required>
-					</div>
-				</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">Cancel</button>
-					<button type="submit" class="btn btn-dark">Update</button>
-				</div>
-			</form>
-		</div>
-	</div>
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit User Allowances</h5>
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                ></button>
+            </div>
+            <form method="post" id="editUserForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Lunches Remaining</label>
+                        <input
+                            type="number"
+                            name="lunches"
+                            id="editLunches"
+                            class="form-control"
+                            min="0"
+                            required
+                        />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dinners Remaining</label>
+                        <input
+                            type="number"
+                            name="dinners"
+                            id="editDinners"
+                            class="form-control"
+                            min="0"
+                            required
+                        />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Drinks Remaining</label>
+                        <input
+                            type="number"
+                            name="drinks"
+                            id="editDrinks"
+                            class="form-control"
+                            min="0"
+                            required
+                        />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button
+                        type="button"
+                        class="btn btn-outline-blue"
+                        data-bs-dismiss="modal"
+                    >
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-blue">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>
-function editUser(id, lunches, dinners, drinks) {
-	document.getElementById('editLunches').value = lunches;
-	document.getElementById('editDinners').value = dinners;
-	document.getElementById('editDrinks').value = drinks;
-	document.getElementById('editUserForm').action = `/administrator/users/edit/${id}/`;
-	new bootstrap.Modal(document.getElementById('editUserModal')).show();
-}
+    function editUser(id, lunches, dinners, drinks) {
+        document.getElementById("editLunches").value = lunches;
+        document.getElementById("editDinners").value = dinners;
+        document.getElementById("editDrinks").value = drinks;
+        document.getElementById("editUserForm").action =
+            `/administrator/users/edit/${id}/`;
+        new bootstrap.Modal(document.getElementById("editUserModal")).show();
+    }
 </script>
 {% endblock %}

@@ -1,25 +1,33 @@
-from django.db import models
 from datetime import timedelta
+
+from django.contrib.auth.models import User as AuthUser
+from django.db import models
 from django.utils import timezone
+
 
 # Create your models here.
 class User(models.Model):
-    WEEKLY_LUNCHES = 5
-    WEEKLY_DINNERS = 5
-    WEEKLY_DRINKS = 10
+    WEEKLY_LUNCHES = 3
+    WEEKLY_DINNERS = 3
+    WEEKLY_DRINKS = 15
 
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    gender = models.CharField(max_length=10, choices=[('M', 'Male'), ('F', 'Female')])
+    gender = models.CharField(
+        max_length=10,
+        choices=[("M", "Male"), ("F", "Female"), ("UNKNOWN", "Unknown")],
+        default="UNKNOWN",
+    )
     lunches_remaining = models.IntegerField(default=WEEKLY_LUNCHES)
     dinners_remaining = models.IntegerField(default=WEEKLY_DINNERS)
     drinks_remaining = models.IntegerField(default=WEEKLY_DRINKS)
+    rotary_club = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     week_start = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = ['first_name', 'last_name', 'gender']
+        unique_together = ["first_name", "last_name", "gender"]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
@@ -48,20 +56,58 @@ class User(models.Model):
 
 class MealLog(models.Model):
     MEAL_TYPES = [
-        ('lunch', 'Lunch'),
-        ('dinner', 'Dinner'),
-        ('drink', 'Drink'),
+        ("lunch", "Lunch"),
+        ("dinner", "Dinner"),
+        ("drink", "Drink"),
     ]
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meal_logs')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="meal_logs")
     meal_type = models.CharField(max_length=10, choices=MEAL_TYPES)
     consumed_at = models.DateTimeField(auto_now_add=True)
     serving_point = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
-        unique_together = ['user', 'meal_type', 'consumed_at']
+        ordering = ["-consumed_at"]
 
     def __str__(self):
         return f"{self.user.full_name} - {self.meal_type} - {self.consumed_at}"
+
+
+class Conversation(models.Model):
+    """Track chatbot conversation sessions"""
+
+    title = models.CharField(max_length=200, default="New Conversation")
+    user = models.ForeignKey(AuthUser, on_delete=models.CASCADE, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.title} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class ChatMessage(models.Model):
+    """Individual messages within a conversation"""
+
+    ROLE_CHOICES = [
+        ("user", "User"),
+        ("assistant", "Assistant"),
+        ("system", "System"),
+    ]
+
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="messages"
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.role}: {self.content[:50]}..."
 
 
 class DrinkType(models.Model):
@@ -76,16 +122,20 @@ class DrinkType(models.Model):
 
 class DrinkTransaction(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('approved', 'Approved'),
-        ('denied', 'Denied'),
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("denied", "Denied"),
     ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='drink_transactions')
-    drink_type = models.ForeignKey(DrinkType, on_delete=models.CASCADE, related_name='transactions')
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="drink_transactions"
+    )
+    drink_type = models.ForeignKey(
+        DrinkType, on_delete=models.CASCADE, related_name="transactions"
+    )
     quantity = models.IntegerField(default=1)
     serving_point = models.CharField(max_length=100)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     served_at = models.DateTimeField(auto_now_add=True)
     approved_at = models.DateTimeField(null=True, blank=True)
 

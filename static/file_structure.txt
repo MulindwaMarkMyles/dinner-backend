@@ -1,0 +1,247 @@
+[ 416]  .
+├── [6.6K]  README.md
+├── [176K]  db.sqlite3
+├── [ 256]  dinner_backend
+│   ├── [   0]  __init__.py
+│   ├── [ 192]  __pycache__
+│   │   ├── [ 173]  __init__.cpython-313.pyc
+│   │   ├── [3.0K]  settings.cpython-313.pyc
+│   │   ├── [1.3K]  urls.cpython-313.pyc
+│   │   └── [ 675]  wsgi.cpython-313.pyc
+│   ├── [ 405]  asgi.py
+│   ├── [3.7K]  settings.py
+│   ├── [ 986]  urls.py
+│   └── [ 405]  wsgi.py
+├── [   0]  file_structure.txt
+├── [ 512]  main
+│   ├── [   0]  __init__.py
+│   ├── [ 320]  __pycache__
+│   │   ├── [ 163]  __init__.cpython-313.pyc
+│   │   ├── [1.9K]  admin.cpython-313.pyc
+│   │   ├── [8.8K]  admin_views.cpython-313.pyc
+│   │   ├── [ 462]  apps.cpython-313.pyc
+│   │   ├── [6.1K]  models.cpython-313.pyc
+│   │   ├── [2.6K]  serializers.cpython-313.pyc
+│   │   ├── [2.2K]  urls.cpython-313.pyc
+│   │   └── [ 16K]  views.cpython-313.pyc
+│   ├── [1021]  admin.py
+│   ├── [5.4K]  admin_views.py
+│   ├── [  83]  apps.py
+│   ├── [  96]  management
+│   │   └── [ 128]  commands
+│   │       ├── [  96]  __pycache__
+│   │       │   └── [5.9K]  fill_test_data.cpython-313.pyc
+│   │       └── [3.5K]  fill_test_data.py
+│   ├── [ 192]  migrations
+│   │   ├── [3.2K]  0001_initial.py
+│   │   ├── [ 659]  0002_drinktransaction_approved_at_drinktransaction_status.py
+│   │   ├── [   0]  __init__.py
+│   │   └── [ 160]  __pycache__
+│   │       ├── [3.6K]  0001_initial.cpython-313.pyc
+│   │       ├── [1.1K]  0002_drinktransaction_approved_at_drinktransaction_status.cpython-313.pyc
+│   │       └── [ 174]  __init__.cpython-313.pyc
+│   ├── [3.3K]  models.py
+│   ├── [1.1K]  serializers.py
+│   ├── [ 256]  templates
+│   │   ├── [2.0K]  admin_approvals.html
+│   │   ├── [4.1K]  admin_base.html
+│   │   ├── [2.7K]  admin_dashboard.html
+│   │   ├── [3.8K]  admin_inventory.html
+│   │   ├── [1.3K]  admin_meal_logs.html
+│   │   └── [3.3K]  admin_users.html
+│   ├── [  60]  tests.py
+│   ├── [1.7K]  urls.py
+│   └── [ 13K]  views.py
+├── [ 670]  manage.py
+├── [ 217]  requirements.txt
+└── [ 160]  staticfiles
+    ├── [ 160]  admin
+    │   ├── [ 512]  css
+    │   │   ├── [9.0K]  autocomplete.css
+    │   │   ├── [ 23K]  base.css
+    │   │   ├── [7.3K]  changelists.css
+    │   │   ├── [3.5K]  dark_mode.css
+    │   │   ├── [ 441]  dashboard.css
+    │   │   ├── [8.6K]  forms.css
+    │   │   ├── [ 951]  login.css
+    │   │   ├── [2.7K]  nav_sidebar.css
+    │   │   ├── [ 16K]  responsive.css
+    │   │   ├── [2.1K]  responsive_rtl.css
+    │   │   ├── [4.7K]  rtl.css
+    │   │   ├── [ 663]  unusable_password_field.css
+    │   │   ├── [  96]  vendor
+    │   │   │   └── [ 160]  select2
+    │   │   │       ├── [1.1K]  LICENSE-SELECT2.md
+    │   │   │       ├── [ 17K]  select2.css
+    │   │   │       └── [ 15K]  select2.min.css
+    │   │   └── [ 12K]  widgets.css
+    │   ├── [ 928]  img
+    │   │   ├── [3.0K]  README.md
+    │   │   ├── [1.3K]  calendar-icons.svg
+    │   │   ├── [ 593]  icon-addlink.svg
+    │   │   ├── [ 684]  icon-alert-dark.svg
+    │   │   ├── [ 684]  icon-alert.svg
+    │   │   ├── [1.1K]  icon-calendar.svg
+    │   │   ├── [ 978]  icon-changelink.svg
+    │   │   ├── [ 805]  icon-clock.svg
+    │   │   ├── [1.2K]  icon-debug-dark.svg
+    │   │   ├── [1.2K]  icon-debug.svg
+    │   │   ├── [ 689]  icon-deletelink.svg
+    │   │   ├── [1.1K]  icon-hidelink.svg
+    │   │   ├── [ 630]  icon-info-dark.svg
+    │   │   ├── [ 630]  icon-info.svg
+    │   │   ├── [ 645]  icon-no-dark.svg
+    │   │   ├── [ 645]  icon-no.svg
+    │   │   ├── [ 806]  icon-unknown-alt.svg
+    │   │   ├── [ 806]  icon-unknown.svg
+    │   │   ├── [ 928]  icon-viewlink.svg
+    │   │   ├── [ 558]  icon-yes-dark.svg
+    │   │   ├── [ 558]  icon-yes.svg
+    │   │   ├── [ 651]  inline-delete.svg
+    │   │   ├── [ 607]  search.svg
+    │   │   ├── [2.3K]  selector-icons.svg
+    │   │   ├── [1.7K]  sorting-icons.svg
+    │   │   ├── [ 593]  tooltag-add.svg
+    │   │   └── [ 569]  tooltag-arrowright.svg
+    │   └── [ 672]  js
+    │       ├── [4.4K]  SelectBox.js
+    │       ├── [ 16K]  SelectFilter2.js
+    │       ├── [7.9K]  actions.js
+    │       ├── [ 128]  admin
+    │       │   ├── [ 19K]  DateTimeShortcuts.js
+    │       │   └── [9.5K]  RelatedObjectLookups.js
+    │       ├── [1.0K]  autocomplete.js
+    │       ├── [8.9K]  calendar.js
+    │       ├── [ 884]  cancel.js
+    │       ├── [ 606]  change_form.js
+    │       ├── [6.1K]  core.js
+    │       ├── [ 978]  filters.js
+    │       ├── [ 15K]  inlines.js
+    │       ├── [ 347]  jquery.init.js
+    │       ├── [3.0K]  nav_sidebar.js
+    │       ├── [ 532]  popup_response.js
+    │       ├── [1.5K]  prepopulate.js
+    │       ├── [ 586]  prepopulate_init.js
+    │       ├── [1.6K]  theme.js
+    │       ├── [7.7K]  urlify.js
+    │       └── [ 160]  vendor
+    │           ├── [ 160]  jquery
+    │           │   ├── [1.1K]  LICENSE.txt
+    │           │   ├── [279K]  jquery.js
+    │           │   └── [ 85K]  jquery.min.js
+    │           ├── [ 192]  select2
+    │           │   ├── [1.1K]  LICENSE.md
+    │           │   ├── [1.9K]  i18n
+    │           │   │   ├── [ 866]  af.js
+    │           │   │   ├── [ 905]  ar.js
+    │           │   │   ├── [ 721]  az.js
+    │           │   │   ├── [ 968]  bg.js
+    │           │   │   ├── [1.3K]  bn.js
+    │           │   │   ├── [ 965]  bs.js
+    │           │   │   ├── [ 900]  ca.js
+    │           │   │   ├── [1.3K]  cs.js
+    │           │   │   ├── [ 828]  da.js
+    │           │   │   ├── [ 866]  de.js
+    │           │   │   ├── [1017]  dsb.js
+    │           │   │   ├── [1.2K]  el.js
+    │           │   │   ├── [ 844]  en.js
+    │           │   │   ├── [ 922]  es.js
+    │           │   │   ├── [ 801]  et.js
+    │           │   │   ├── [ 868]  eu.js
+    │           │   │   ├── [1023]  fa.js
+    │           │   │   ├── [ 803]  fi.js
+    │           │   │   ├── [ 924]  fr.js
+    │           │   │   ├── [ 924]  gl.js
+    │           │   │   ├── [ 984]  he.js
+    │           │   │   ├── [1.1K]  hi.js
+    │           │   │   ├── [ 852]  hr.js
+    │           │   │   ├── [1018]  hsb.js
+    │           │   │   ├── [ 831]  hu.js
+    │           │   │   ├── [1.0K]  hy.js
+    │           │   │   ├── [ 768]  id.js
+    │           │   │   ├── [ 807]  is.js
+    │           │   │   ├── [ 897]  it.js
+    │           │   │   ├── [ 862]  ja.js
+    │           │   │   ├── [1.2K]  ka.js
+    │           │   │   ├── [1.1K]  km.js
+    │           │   │   ├── [ 855]  ko.js
+    │           │   │   ├── [ 944]  lt.js
+    │           │   │   ├── [ 900]  lv.js
+    │           │   │   ├── [1.0K]  mk.js
+    │           │   │   ├── [ 811]  ms.js
+    │           │   │   ├── [ 778]  nb.js
+    │           │   │   ├── [1.3K]  ne.js
+    │           │   │   ├── [ 904]  nl.js
+    │           │   │   ├── [ 947]  pl.js
+    │           │   │   ├── [1.0K]  ps.js
+    │           │   │   ├── [ 876]  pt-BR.js
+    │           │   │   ├── [ 878]  pt.js
+    │           │   │   ├── [ 938]  ro.js
+    │           │   │   ├── [1.1K]  ru.js
+    │           │   │   ├── [1.3K]  sk.js
+    │           │   │   ├── [ 925]  sl.js
+    │           │   │   ├── [ 903]  sq.js
+    │           │   │   ├── [1.1K]  sr-Cyrl.js
+    │           │   │   ├── [ 980]  sr.js
+    │           │   │   ├── [ 786]  sv.js
+    │           │   │   ├── [1.0K]  th.js
+    │           │   │   ├── [ 771]  tk.js
+    │           │   │   ├── [ 775]  tr.js
+    │           │   │   ├── [1.1K]  uk.js
+    │           │   │   ├── [ 796]  vi.js
+    │           │   │   ├── [ 768]  zh-CN.js
+    │           │   │   └── [ 707]  zh-TW.js
+    │           │   ├── [169K]  select2.full.js
+    │           │   └── [ 77K]  select2.full.min.js
+    │           └── [ 160]  xregexp
+    │               ├── [1.1K]  LICENSE.txt
+    │               ├── [318K]  xregexp.js
+    │               └── [159K]  xregexp.min.js
+    ├── [ 94K]  logo.png
+    └── [ 224]  rest_framework
+        ├── [ 320]  css
+        │   ├── [ 23K]  bootstrap-theme.min.css
+        │   ├── [ 74K]  bootstrap-theme.min.css.map
+        │   ├── [3.3K]  bootstrap-tweaks.css
+        │   ├── [119K]  bootstrap.min.css
+        │   ├── [528K]  bootstrap.min.css.map
+        │   ├── [1.1K]  default.css
+        │   ├── [ 21K]  font-awesome-4.0.3.css
+        │   └── [ 817]  prettify.css
+        ├── [ 160]  docs
+        │   ├── [ 160]  css
+        │   │   ├── [6.0K]  base.css
+        │   │   ├── [1.6K]  highlight.css
+        │   │   └── [1.3K]  jquery.json-view.min.css
+        │   ├── [ 128]  img
+        │   │   ├── [5.3K]  favicon.ico
+        │   │   └── [1.4K]  grid.png
+        │   └── [ 160]  js
+        │       ├── [ 10K]  api.js
+        │       ├── [294K]  highlight.pack.js
+        │       └── [2.6K]  jquery.json-view.min.js
+        ├── [ 352]  fonts
+        │   ├── [ 37K]  fontawesome-webfont.eot
+        │   ├── [197K]  fontawesome-webfont.svg
+        │   ├── [ 79K]  fontawesome-webfont.ttf
+        │   ├── [ 43K]  fontawesome-webfont.woff
+        │   ├── [ 20K]  glyphicons-halflings-regular.eot
+        │   ├── [106K]  glyphicons-halflings-regular.svg
+        │   ├── [ 44K]  glyphicons-halflings-regular.ttf
+        │   ├── [ 23K]  glyphicons-halflings-regular.woff
+        │   └── [ 18K]  glyphicons-halflings-regular.woff2
+        ├── [ 160]  img
+        │   ├── [8.6K]  glyphicons-halflings-white.png
+        │   ├── [ 12K]  glyphicons-halflings.png
+        │   └── [1.4K]  grid.png
+        └── [ 320]  js
+            ├── [3.7K]  ajax-form.js
+            ├── [ 39K]  bootstrap.min.js
+            ├── [154K]  coreapi-0.1.1.js
+            ├── [1.8K]  csrf.js
+            ├── [1.2K]  default.js
+            ├── [ 85K]  jquery-3.7.1.min.js
+            ├── [  59]  load-ajax-form.js
+            └── [ 13K]  prettify-min.js
+
+33 directories, 212 files
