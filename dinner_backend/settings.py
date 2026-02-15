@@ -108,7 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Africa/Nairobi"
 
 USE_I18N = True
 
@@ -130,20 +130,6 @@ STATICFILES_DIRS = [BASE_DIR / "static", BASE_DIR / "staticfiles"]
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-# Google Sheets API Configuration
-GOOGLE_SHEETS_ID = "1JnwU65y6-_XEyYpvx7jfqVqcnHAaFYmkinUCwBR6JsY"
-GOOGLE_SHEETS_CSV_URL = (
-    f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEETS_ID}/export?format=csv"
-)
-
-# Cache Configuration
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "unique-snowflake",
-    }
-}
-
 LOGIN_URL = "custom_admin_login"  # Custom admin login view
 LOGIN_REDIRECT_URL = "admin_dashboard"
 
@@ -162,3 +148,15 @@ OPENAI_MODEL_NAME = "gpt-4o-mini"
 GITHUB_TOKEN = "your-github-token"
 GITHUB_MODELS_ENDPOINT = "https://your-github-models-endpoint"
 GITHUB_MODEL_NAME = "gpt-4o-mini"
+
+SHEET_CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4mjqkQBI20AiK6Cz4ySPkeBaxFkflFnlHGIpRGyqyoiTl75r-GGySpyn_FQ1WKSrxr1N6jiErYGBT/pub?gid=0&single=true&output=csv"
+MAKE_WEBHOOK_URL="https://hook.eu2.make.com/b828fdhzcypgbffyp7yy9oeymqzf9ley"
+POLL_INTERVAL="60"
+STATE_FILE="sheet_state.json"
+DRIVE_FOLDER_ID="1yCZKMoCQ3s_tRAB0m7B0ztkcaKvvcmjM"
+SHEET_ID="1JnwU65y6-_XEyYpvx7jfqVqcnHAaFYmkinUCwBR6JsY"
+CREDENTIALS_FILE="credentials.json"
+CLOUDINARY_CLOUD_NAME="dszfqzgol"
+CLOUDINARY_API_KEY="235163343313112"
+
+CLOUDINARY_API_SECRET="S8eFek7KNQ__WaT7rUjHfl1IKz0"

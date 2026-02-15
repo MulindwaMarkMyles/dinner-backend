@@ -64,6 +64,18 @@ urlpatterns = [
         name="delete_user",
     ),
     path("administrator/logs/", admin_views.meal_logs, name="meal_logs"),
+    # Public chatbot API
+    path("main/api/chatbot/send/", views.chatbot_send, name="chatbot_send"),
+    path(
+        "main/api/chatbot/history/<int:conversation_id>/",
+        views.chatbot_history,
+        name="chatbot_history",
+    ),
+    path(
+        "main/api/chatbot/conversations/",
+        views.chatbot_conversations,
+        name="chatbot_conversations",
+    ),
     path("administrator/chatbot/", admin_views.chatbot_view, name="chatbot_view"),
     path(
         "administrator/chatbot/conversation/",

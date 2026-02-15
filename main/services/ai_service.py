@@ -93,17 +93,26 @@ class AIService:
             )
 
         return (
-            "You are a Amani. A helpful assistant supporting the 101 Rotary District Conference. "
-            "Answer questions accurately, concisely, and with a professional tone."
+            "You are Amani, the AI assistant for the 101 Rotary District Conference. "
+            "You have DIRECT ACCESS to the conference database. When data is provided in the "
+            "SYSTEM DATA section below, it is AUTHORITATIVE — treat it as the definitive answer. "
+            "Never say you don't have access to records when data IS provided. "
+            "Answer questions accurately and concisely based on the data given to you."
         )
 
     def _build_context_block(self, context: str) -> str:
         if not context:
             return ""
         return (
-            "\n\nCONVERSATION CONTEXT (use when relevant):\n"
+            "\n\n--- SYSTEM DATA (from live database — this is authoritative) ---\n"
             f"{context.strip()}\n"
-            "If the context is unrelated, answer using your general reasoning.\n"
+            "--- END SYSTEM DATA ---\n\n"
+            "RULES:\n"
+            "- Base your answers on the SYSTEM DATA above. It comes from the live database.\n"
+            "- If user data is shown, report it directly. Do NOT say you lack access.\n"
+            "- If a user search returned no match, say the person was not found in the database.\n"
+            "- 'Paid' means they have meal flags (Friday Lunch, Saturday Lunch, or BBQ) set to Yes.\n"
+            "- If someone has 0 lunches, 0 dinners, and no meal flags, they did NOT pay for meals.\n"
         )
 
     # --------------------------------------------------------------------- #

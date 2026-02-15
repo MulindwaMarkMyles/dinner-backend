@@ -2,6 +2,49 @@
 
 A Django REST API for managing lunch, dinner, and drink allowances at events.
 
+## Quick Start
+
+```bash
+# 1. Place CSV files in project root:
+#    - lunch_bbq_data.csv
+#    - other_data.csv
+
+# 2. Run setup script
+./setup.sh
+
+# 3. Start server
+python manage.py runserver
+```
+
+For detailed migration guide, see [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md).
+
+## Local CSV import workflow (DB-only)
+
+The app now uses local DB records only (no Google Sheets fetch at runtime).
+
+Source files expected at project root:
+- `lunch_bbq_data.csv`
+- `other_data.csv`
+
+Run import:
+
+```bash
+python manage.py migrate
+python manage.py import_event_data
+```
+
+Optional reset of users before import:
+
+```bash
+python manage.py import_event_data --reset-users
+```
+
+Import behavior:
+- Creates/updates users from both CSV files.
+- Maps `Friday Lunch` + `Saturday Lunch` to `lunches_remaining`.
+- Maps `Meat & Greet BBQ` to `dinners_remaining`.
+- Stores delegate metadata (`delegate_reg_id`, `external_uuid`, `membership`, `rotary_club`).
+
 
 ## API Endpoints
 

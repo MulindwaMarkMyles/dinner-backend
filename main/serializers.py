@@ -6,7 +6,12 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'full_name', 'gender', 'lunches_remaining', 'dinners_remaining', 'drinks_remaining']
+        fields = [
+            'id', 'first_name', 'last_name', 'full_name', 'gender',
+            'lunches_remaining', 'dinners_remaining', 'drinks_remaining',
+            'rotary_club', 'membership', 'delegate_reg_id',
+            'has_friday_lunch', 'has_saturday_lunch', 'has_bbq'
+        ]
 
 class MealLogSerializer(serializers.ModelSerializer):
     class Meta:

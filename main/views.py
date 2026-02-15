@@ -1,39 +1,11 @@
-import csv
-from io import StringIO
+from datetime import datetime
 
-import requests
-from django.conf import settings
-from django.core.cache import cache
-from django.shortcuts import render
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import DrinkTransaction, DrinkType, MealLog, User
 from .serializers import DrinkTransactionSerializer, DrinkTypeSerializer, UserSerializer
-
-
-# Fetch data from Google Sheets as CSV with caching
-def get_google_sheet_data():
-    """Fetch data from Google Sheets as CSV with 5-minute cache"""
-    cached_data = cache.get("google_sheet_data")
-    if cached_data is not None:
-        return cached_data
-
-    try:
-        response = requests.get(settings.GOOGLE_SHEETS_CSV_URL, timeout=10)
-        response.raise_for_status()
-
-        csv_data = StringIO(response.text)
-        reader = csv.DictReader(csv_data)
-        data = list(reader)
-
-        # Cache for 5 minutes
-        cache.set("google_sheet_data", data, 300)
-        return data
-    except Exception as e:
-        print(f"Error fetching from Google Sheets: {e}")
-        return None
 
 
 def normalize_gender(gender):
@@ -62,55 +34,8 @@ def normalize_name(name):
     return " ".join(name.strip().split())
 
 
-def find_user_in_sheet(first_name, last_name, gender):
-    """Search for user in Google Sheet by FULLNAME (new sheet structure has FULLNAME, PHONE NUMBER, EMAIL, CLUB)"""
-    data = get_google_sheet_data()
-    if not data:
-        print("No data from Google Sheets")
-        return None
-
-    # Normalize search terms
-    search_first = normalize_name(first_name).lower()
-    search_last = normalize_name(last_name).lower()
-    search_gender = normalize_gender(gender)
-    search_full = (
-        f"{normalize_name(first_name)} {normalize_name(last_name)}".strip().lower()
-    )
-    print(
-        f"[sheet-search] raw=({first_name}, {last_name}, {gender}) normalized=({search_first}, {search_last}, {search_gender}) full={search_full}"
-    )
-
-    for row in data:
-        # New sheet has FULLNAME column
-        sheet_fullname = normalize_name(row.get("FULLNAME", "")).strip().lower()
-        print(f"[sheet-row] fullname={sheet_fullname}")
-
-        # Match by full name (ignore gender since sheet doesn't have it)
-        if sheet_fullname == search_full:
-            print(f"✓ User found: {first_name} {last_name}")
-            return row
-
-        # Also try matching just by comparing the names
-        # Split the sheet fullname and compare
-        sheet_parts = sheet_fullname.split()
-        search_parts = search_full.split()
-
-        if len(sheet_parts) >= 2 and len(search_parts) >= 2:
-            # Compare first and last names flexibly
-            if (
-                sheet_parts[0] == search_parts[0]
-                and sheet_parts[-1] == search_parts[-1]
-            ):
-                print(f"✓ User found (flexible match): {first_name} {last_name}")
-                return row
-
-    print(f"✗ User not found: {first_name} {last_name}")
-    return None
-
-
 def verify_user_exists(first_name, last_name, gender):
-    """Fast check if user exists - checks DB first, then sheet"""
-    # Normalize gender
+    """Fast check if user exists in DB only."""
     normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
@@ -118,10 +43,9 @@ def verify_user_exists(first_name, last_name, gender):
         f"[verify] raw=({first_name}, {last_name}, {gender}) normalized=({normalized_first}, {normalized_last}, {normalized_gender})"
     )
 
-    # First check if user already exists in DB (check by name, ignore gender for matching)
+    # Check in DB (name-first, then gender match, then name fallback)
     try:
         print("[verify] checking DB")
-        # Try to find by first_name and last_name, regardless of gender
         users = User.objects.filter(
             first_name__iexact=normalized_first, last_name__iexact=normalized_last
         )
@@ -141,15 +65,6 @@ def verify_user_exists(first_name, last_name, gender):
     except Exception as e:
         print(f"[verify] DB error: {e}")
 
-    # Check sheet
-    print("[verify] checking sheet")
-    sheet_user = find_user_in_sheet(
-        normalized_first, normalized_last, normalized_gender
-    )
-    if sheet_user:
-        print("[verify] sheet match found")
-        return True, None
-    print("[verify] sheet miss")
     return False, None
 
 
@@ -183,17 +98,45 @@ def consume_lunch(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # Get or create user
-    if existing_user:
-        user = existing_user
-    else:
-        user, created = User.objects.get_or_create(
-            first_name=normalized_first,
-            last_name=normalized_last,
-            gender=normalized_gender,
-        )
+    # User must already exist in DB (imported from CSV)
+    user = existing_user
 
     user.reset_weekly_allowance()
+
+    # Check lunch day restrictions
+    current_day = datetime.now().weekday()  # 0=Monday, 4=Friday, 5=Saturday
+    has_specific_lunch = user.has_friday_lunch or user.has_saturday_lunch
+    
+    if has_specific_lunch:
+        # User registered for specific day(s) only
+        allowed_days = []
+        if user.has_friday_lunch:
+            allowed_days.append("Friday")
+        if user.has_saturday_lunch:
+            allowed_days.append("Saturday")
+        
+        is_friday = current_day == 4
+        is_saturday = current_day == 5
+        
+        if user.has_friday_lunch and not is_friday:
+            return Response(
+                {"error": "You are only registered for Friday lunch"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
+        if user.has_saturday_lunch and not user.has_friday_lunch and not is_saturday:
+            return Response(
+                {"error": "You are only registered for Saturday lunch"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
+        if user.has_friday_lunch and user.has_saturday_lunch:
+            if not (is_friday or is_saturday):
+                return Response(
+                    {"error": f"You are only registered for {' and '.join(allowed_days)} lunch"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+    # else: User has no specific lunch flags, they paid for all meals - allow any day
 
     if user.lunches_remaining <= 0:
         return Response(
@@ -234,15 +177,8 @@ def consume_dinner(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # Get or create user
-    if existing_user:
-        user = existing_user
-    else:
-        user, created = User.objects.get_or_create(
-            first_name=normalized_first,
-            last_name=normalized_last,
-            gender=normalized_gender,
-        )
+    # User must already exist in DB (imported from CSV)
+    user = existing_user
 
     user.reset_weekly_allowance()
 
@@ -329,15 +265,8 @@ def consume_drink(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Get or create user
-    if existing_user:
-        user = existing_user
-    else:
-        user, created = User.objects.get_or_create(
-            first_name=normalized_first,
-            last_name=normalized_last,
-            gender=normalized_gender,
-        )
+    # User must already exist in DB (imported from CSV)
+    user = existing_user
 
     user.reset_weekly_allowance()
 
@@ -365,6 +294,171 @@ def consume_drink(request):
     )
 
 
+# ────────────────────────────────────────────────────────────
+# Public Chatbot API
+# ────────────────────────────────────────────────────────────
+
+@api_view(["POST"])
+def chatbot_send(request):
+    """Send a message and get an AI response.
+
+    Body (JSON):
+        message            – (required) the user's message text
+        conversation_id    – (optional) existing conversation ID to continue
+        session_id         – (optional) client-generated UUID to group conversations
+
+    Returns 200 with:
+        conversation_id, title, message (assistant reply)
+    """
+    from main.admin_views import _build_smart_context
+    from main.models import ChatMessage, Conversation
+    from main.services.ai_service import AIService
+
+    user_message = request.data.get("message", "").strip()
+    conversation_id = request.data.get("conversation_id")
+    session_id = request.data.get("session_id")
+
+    if not user_message:
+        return Response(
+            {"error": "message is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        # Get or create conversation
+        if conversation_id:
+            try:
+                conversation = Conversation.objects.get(id=conversation_id)
+                # If session_id provided, verify it matches
+                if session_id and conversation.session_id and conversation.session_id != session_id:
+                    return Response(
+                        {"error": "session_id does not match this conversation"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            except Conversation.DoesNotExist:
+                return Response(
+                    {"error": "Conversation not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        else:
+            conversation = Conversation.objects.create(session_id=session_id)
+
+        # Save user message
+        ChatMessage.objects.create(
+            conversation=conversation, role="user", content=user_message
+        )
+
+        # Build conversation history for follow-up support
+        messages = []
+        for msg in conversation.messages.all():
+            if msg.role != "system":
+                messages.append({"role": msg.role, "content": msg.content})
+
+        # Build smart context (same pipeline as admin chatbot)
+        context = _build_smart_context("Guest", user_message, messages)
+
+        # Get AI response
+        ai_service = AIService()
+        assistant_response = ai_service.generate_response(
+            messages=messages, context=context
+        )
+
+        # Save assistant response
+        ChatMessage.objects.create(
+            conversation=conversation, role="assistant", content=assistant_response
+        )
+
+        # Auto-generate title on first exchange
+        if conversation.messages.count() == 2:
+            title = ai_service.generate_title(user_message)
+            conversation.title = title
+            conversation.save()
+
+        return Response(
+            {
+                "conversation_id": conversation.id,
+                "title": conversation.title,
+                "message": assistant_response,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+def chatbot_history(request, conversation_id):
+    """Retrieve full message history for a conversation.
+
+    Query params:
+        session_id – (optional) must match if the conversation was created with one
+
+    Returns 200 with:
+        conversation_id, title, messages [{role, content, created_at}, ...]
+    """
+    from main.models import Conversation
+
+    session_id = request.query_params.get("session_id")
+
+    try:
+        conversation = Conversation.objects.get(id=conversation_id)
+    except Conversation.DoesNotExist:
+        return Response(
+            {"error": "Conversation not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # If session_id guard is present, enforce it
+    if session_id and conversation.session_id and conversation.session_id != session_id:
+        return Response(
+            {"error": "session_id does not match this conversation"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    messages = list(
+        conversation.messages.values("role", "content", "created_at")
+    )
+    return Response(
+        {
+            "conversation_id": conversation.id,
+            "title": conversation.title,
+            "messages": messages,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+def chatbot_conversations(request):
+    """List recent conversations for a session.
+
+    Query params:
+        session_id – (required) the client session UUID
+
+    Returns 200 with:
+        conversations [{id, title, created_at, updated_at}, ...]
+    """
+    from main.models import Conversation
+
+    session_id = request.query_params.get("session_id")
+    if not session_id:
+        return Response(
+            {"error": "session_id query param is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    conversations = (
+        Conversation.objects.filter(session_id=session_id)
+        .order_by("-updated_at")
+        .values("id", "title", "created_at", "updated_at")[:20]
+    )
+    return Response(
+        {"conversations": list(conversations)},
+        status=status.HTTP_200_OK,
+    )
+
+
 @api_view(["GET"])
 def get_user_status(request):
     first_name = request.query_params.get("first_name")
@@ -377,12 +471,19 @@ def get_user_status(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    normalized_first = normalize_name(first_name)
+    normalized_last = normalize_name(last_name)
+    normalized_gender = normalize_gender(gender)
+
     try:
-        user = User.objects.get(
-            first_name=normalize_name(first_name),
-            last_name=normalize_name(last_name),
-            gender=normalize_gender(gender),
+        users = User.objects.filter(
+            first_name__iexact=normalized_first,
+            last_name__iexact=normalized_last,
         )
+        if not users.exists():
+            raise User.DoesNotExist
+
+        user = users.filter(gender__iexact=normalized_gender).first() or users.first()
         user.reset_weekly_allowance()
         return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
     except User.DoesNotExist:

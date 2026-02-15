@@ -22,6 +22,12 @@ class User(models.Model):
     dinners_remaining = models.IntegerField(default=WEEKLY_DINNERS)
     drinks_remaining = models.IntegerField(default=WEEKLY_DRINKS)
     rotary_club = models.CharField(max_length=100, null=True, blank=True)
+    delegate_reg_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
+    external_uuid = models.CharField(max_length=36, null=True, blank=True, db_index=True)
+    membership = models.CharField(max_length=20, null=True, blank=True)
+    has_friday_lunch = models.BooleanField(default=False)
+    has_saturday_lunch = models.BooleanField(default=False)
+    has_bbq = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     week_start = models.DateTimeField(default=timezone.now)
@@ -77,6 +83,10 @@ class Conversation(models.Model):
 
     title = models.CharField(max_length=200, default="New Conversation")
     user = models.ForeignKey(AuthUser, on_delete=models.CASCADE, null=True, blank=True)
+    session_id = models.CharField(
+        max_length=100, null=True, blank=True, db_index=True,
+        help_text="Client-generated ID for public (unauthenticated) conversations",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
