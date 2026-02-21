@@ -25,6 +25,8 @@ class User(models.Model):
     delegate_reg_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     external_uuid = models.CharField(max_length=36, null=True, blank=True, db_index=True)
     membership = models.CharField(max_length=20, null=True, blank=True)
+    district = models.CharField(max_length=50, null=True, blank=True)
+    dietary_requirements = models.CharField(max_length=200, null=True, blank=True)
     has_friday_lunch = models.BooleanField(default=False)
     has_saturday_lunch = models.BooleanField(default=False)
     has_bbq = models.BooleanField(default=False)
