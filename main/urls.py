@@ -3,8 +3,10 @@ from django.urls import path
 from . import admin_views, views
 
 urlpatterns = [
+    path("main/api/auth/login/", views.api_login, name="api_login"),
     path("main/api/lunch/", views.consume_lunch, name="consume_lunch"),
     path("main/api/dinner/", views.consume_dinner, name="consume_dinner"),
+    path("main/api/bbq/", views.consume_bbq, name="consume_bbq"),
     path("main/api/drink/", views.consume_drink, name="consume_drink"),
     path("main/api/user/", views.get_user_status, name="get_user_status"),
     path("main/api/drinks/", views.list_drinks, name="list_drinks"),
@@ -25,6 +27,7 @@ urlpatterns = [
         name="custom_admin_logout",
     ),
     path("administrator/", admin_views.admin_dashboard, name="admin_dashboard"),
+    path("", admin_views.admin_dashboard, name="admin_dashboard"),
     path(
         "administrator/inventory/", admin_views.admin_inventory, name="admin_inventory"
     ),
@@ -64,6 +67,11 @@ urlpatterns = [
         name="delete_user",
     ),
     path("administrator/logs/", admin_views.meal_logs, name="meal_logs"),
+    path(
+        "administrator/api-admins/",
+        admin_views.admin_api_admins,
+        name="admin_api_admins",
+    ),
     # Public chatbot API
     path("main/api/chatbot/send/", views.chatbot_send, name="chatbot_send"),
     path(

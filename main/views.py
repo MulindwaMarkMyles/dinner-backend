@@ -1,11 +1,23 @@
 from datetime import datetime
 
+from django.contrib.auth import authenticate
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import DrinkTransaction, DrinkType, MealLog, User
 from .serializers import DrinkTransactionSerializer, DrinkTypeSerializer, UserSerializer
+
+
+def is_api_scanner(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    return user.groups.filter(name="API_SCANNER_ADMIN").exists()
 
 
 def normalize_gender(gender):
@@ -69,6 +81,47 @@ def verify_user_exists(first_name, last_name, gender):
 
 
 @api_view(["POST"])
+def api_login(request):
+    username = request.data.get("username")
+    password = request.data.get("password")
+
+    if not username or not password:
+        return Response(
+            {"error": "username and password are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = authenticate(request, username=username, password=password)
+    if not user:
+        return Response(
+            {"error": "Invalid credentials"},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if not is_api_scanner(user):
+        return Response(
+            {"error": "Account is not allowed to access scanner API"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    refresh = RefreshToken.for_user(user)
+    return Response(
+        {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "is_staff": user.is_staff,
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def consume_lunch(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
@@ -80,15 +133,16 @@ def consume_lunch(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Normalize gender
+    if not is_api_scanner(request.user):
+        return Response(
+            {"error": "Account is not allowed to consume meals"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
-    print(
-        f"Received lunch request for: {normalized_first} {normalized_last} gender={normalized_gender}"
-    )
 
-    # Quick verification
     exists, existing_user = verify_user_exists(
         normalized_first, normalized_last, normalized_gender
     )
@@ -98,45 +152,41 @@ def consume_lunch(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # User must already exist in DB (imported from CSV)
     user = existing_user
-
     user.reset_weekly_allowance()
 
-    # Check lunch day restrictions
-    current_day = datetime.now().weekday()  # 0=Monday, 4=Friday, 5=Saturday
+    current_day = datetime.now().weekday()
     has_specific_lunch = user.has_friday_lunch or user.has_saturday_lunch
-    
+
     if has_specific_lunch:
-        # User registered for specific day(s) only
         allowed_days = []
         if user.has_friday_lunch:
             allowed_days.append("Friday")
         if user.has_saturday_lunch:
             allowed_days.append("Saturday")
-        
+
         is_friday = current_day == 4
         is_saturday = current_day == 5
-        
+
         if user.has_friday_lunch and not is_friday:
             return Response(
                 {"error": "You are only registered for Friday lunch"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         if user.has_saturday_lunch and not user.has_friday_lunch and not is_saturday:
             return Response(
                 {"error": "You are only registered for Saturday lunch"},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        
-        if user.has_friday_lunch and user.has_saturday_lunch:
-            if not (is_friday or is_saturday):
-                return Response(
-                    {"error": f"You are only registered for {' and '.join(allowed_days)} lunch"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-    # else: User has no specific lunch flags, they paid for all meals - allow any day
+
+        if user.has_friday_lunch and user.has_saturday_lunch and not (is_friday or is_saturday):
+            return Response(
+                {
+                    "error": f"You are only registered for {' and '.join(allowed_days)} lunch"
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
     if user.lunches_remaining <= 0:
         return Response(
@@ -145,12 +195,14 @@ def consume_lunch(request):
 
     user.lunches_remaining -= 1
     user.save()
-    MealLog.objects.create(user=user, meal_type="lunch")
+    MealLog.objects.create(user=user, meal_type="lunch", scanned_by=request.user)
 
     return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def consume_dinner(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
@@ -162,12 +214,16 @@ def consume_dinner(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Normalize gender
+    if not is_api_scanner(request.user):
+        return Response(
+            {"error": "Account is not allowed to consume meals"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
 
-    # Quick verification
     exists, existing_user = verify_user_exists(
         normalized_first, normalized_last, normalized_gender
     )
@@ -177,9 +233,7 @@ def consume_dinner(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # User must already exist in DB (imported from CSV)
     user = existing_user
-
     user.reset_weekly_allowance()
 
     if user.dinners_remaining <= 0:
@@ -189,19 +243,18 @@ def consume_dinner(request):
 
     user.dinners_remaining -= 1
     user.save()
-    MealLog.objects.create(user=user, meal_type="dinner")
+    MealLog.objects.create(user=user, meal_type="dinner", scanned_by=request.user)
 
     return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
-def consume_drink(request):
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def consume_bbq(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
     gender = request.data.get("gender")
-    serving_point = request.data.get("serving_point")
-    drink_name = request.data.get("drink_name")
-    quantity = request.data.get("quantity", "1")
 
     if not first_name or not last_name or not gender:
         return Response(
@@ -209,35 +262,16 @@ def consume_drink(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if not serving_point:
+    if not is_api_scanner(request.user):
         return Response(
-            {"error": "serving_point is required"}, status=status.HTTP_400_BAD_REQUEST
+            {"error": "Account is not allowed to consume meals"},
+            status=status.HTTP_403_FORBIDDEN,
         )
 
-    if not drink_name:
-        return Response(
-            {"error": "drink_name is required"}, status=status.HTTP_400_BAD_REQUEST
-        )
-
-    try:
-        quantity = int(quantity)
-        if quantity < 1:
-            raise ValueError
-    except ValueError:
-        return Response(
-            {"error": "quantity must be a positive integer"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Normalize gender
     normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
-    print(
-        f"Received drink request for: {normalized_first} {normalized_last} gender={normalized_gender} drink={drink_name} quantity={quantity}"
-    )
 
-    # Quick verification
     exists, existing_user = verify_user_exists(
         normalized_first, normalized_last, normalized_gender
     )
@@ -247,30 +281,110 @@ def consume_drink(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    # Check if drink type exists
-    try:
-        drink_type = DrinkType.objects.get(name__iexact=drink_name)
-    except DrinkType.DoesNotExist:
+    user = existing_user
+    user.reset_weekly_allowance()
+
+    if not user.has_bbq:
         return Response(
-            {"error": f'Drink type "{drink_name}" not found'},
-            status=status.HTTP_404_NOT_FOUND,
+            {"error": "User does not have access for BBQ"},
+            status=status.HTTP_403_FORBIDDEN,
         )
 
-    # Check drink availability
-    if drink_type.available_quantity < quantity:
+    if MealLog.objects.filter(user=user, meal_type="bbq").exists():
         return Response(
-            {
-                "error": f"Insufficient stock. Only {drink_type.available_quantity} {drink_name} available"
-            },
+            {"error": "User has already consumed BBQ ticket"},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    MealLog.objects.create(user=user, meal_type="bbq", scanned_by=request.user)
+    return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def consume_drink(request):
+    first_name = request.data.get("first_name")
+    last_name = request.data.get("last_name")
+    gender = request.data.get("gender")
+    serving_point = request.data.get("serving_point")
+    items = request.data.get("items")
+
+    if not first_name or not last_name or not gender:
+        return Response(
+            {"error": "first_name, last_name and gender are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # User must already exist in DB (imported from CSV)
-    user = existing_user
+    if not is_api_scanner(request.user):
+        return Response(
+            {"error": "Account is not allowed to consume meals"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
+    if not serving_point:
+        return Response(
+            {"error": "serving_point is required"}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if items is None:
+        drink_name = request.data.get("drink_name")
+        quantity = request.data.get("quantity", 1)
+        items = [{"drink_name": drink_name, "quantity": quantity}]
+
+    if not isinstance(items, list) or not items:
+        return Response(
+            {"error": "items must be a non-empty list"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    normalized_items = []
+    total_requested = 0
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            return Response(
+                {"error": f"items[{index}] must be an object"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        drink_name = item.get("drink_name")
+        quantity = item.get("quantity", 1)
+        if not drink_name:
+            return Response(
+                {"error": f"items[{index}].drink_name is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            quantity = int(quantity)
+            if quantity < 1:
+                raise ValueError
+        except (TypeError, ValueError):
+            return Response(
+                {"error": f"items[{index}].quantity must be a positive integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        total_requested += quantity
+        normalized_items.append({"drink_name": drink_name, "quantity": quantity})
+
+    normalized_gender = normalize_gender(gender)
+    normalized_first = normalize_name(first_name)
+    normalized_last = normalize_name(last_name)
+
+    exists, existing_user = verify_user_exists(
+        normalized_first, normalized_last, normalized_gender
+    )
+    if not exists:
+        return Response(
+            {"error": "User was not found in registry"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    user = existing_user
     user.reset_weekly_allowance()
 
-    if user.drinks_remaining < quantity:
+    if user.drinks_remaining < total_requested:
         return Response(
             {
                 "error": f"Insufficient allowance. Only {user.drinks_remaining} drinks remaining"
@@ -278,17 +392,41 @@ def consume_drink(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Create pending drink transaction (waiting for approval)
-    transaction = DrinkTransaction.objects.create(
-        user=user, drink_type=drink_type, quantity=quantity, serving_point=serving_point
-    )
+    transactions = []
+    for item in normalized_items:
+        try:
+            drink_type = DrinkType.objects.get(name__iexact=item["drink_name"])
+        except DrinkType.DoesNotExist:
+            return Response(
+                {"error": f'Drink type "{item["drink_name"]}" not found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if drink_type.available_quantity < item["quantity"]:
+            return Response(
+                {
+                    "error": f"Insufficient stock. Only {drink_type.available_quantity} {drink_type.name} available"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        transactions.append(
+            DrinkTransaction.objects.create(
+                user=user,
+                drink_type=drink_type,
+                quantity=item["quantity"],
+                serving_point=serving_point,
+                scanned_by=request.user,
+            )
+        )
 
     return Response(
         {
             "message": "Drink order submitted for approval",
             "status": "pending",
             "user": UserSerializer(user).data,
-            "transaction": DrinkTransactionSerializer(transaction).data,
+            "transactions": DrinkTransactionSerializer(transactions, many=True).data,
+            "total_requested": total_requested,
         },
         status=status.HTTP_202_ACCEPTED,
     )

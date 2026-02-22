@@ -18,6 +18,7 @@
                     <tr>
                         <th class="text-muted small">User</th>
                         <th class="text-muted small">Meal Type</th>
+                        <th class="text-muted small">Scanned By</th>
                         <th class="text-muted small">Serving Point</th>
                         <th class="text-muted small">Consumed At</th>
                     </tr>
@@ -32,6 +33,9 @@
                             >
                         </td>
                         <td class="text-muted">
+                            {{ log.scanned_by.username|default:"N/A" }}
+                        </td>
+                        <td class="text-muted">
                             {{ log.serving_point|default:"N/A" }}
                         </td>
                         <td class="text-muted">
@@ -40,7 +44,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center text-muted py-4">
+                        <td colspan="5" class="text-center text-muted py-4">
                             No meal logs found
                         </td>
                     </tr>

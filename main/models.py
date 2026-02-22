@@ -67,11 +67,19 @@ class MealLog(models.Model):
         ("lunch", "Lunch"),
         ("dinner", "Dinner"),
         ("drink", "Drink"),
+        ("bbq", "BBQ"),
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="meal_logs")
     meal_type = models.CharField(max_length=10, choices=MEAL_TYPES)
     consumed_at = models.DateTimeField(auto_now_add=True)
     serving_point = models.CharField(max_length=100, blank=True, null=True)
+    scanned_by = models.ForeignKey(
+        AuthUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scanned_meal_logs",
+    )
 
     class Meta:
         ordering = ["-consumed_at"]
@@ -147,6 +155,13 @@ class DrinkTransaction(models.Model):
     )
     quantity = models.IntegerField(default=1)
     serving_point = models.CharField(max_length=100)
+    scanned_by = models.ForeignKey(
+        AuthUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scanned_drink_transactions",
+    )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     served_at = models.DateTimeField(auto_now_add=True)
     approved_at = models.DateTimeField(null=True, blank=True)

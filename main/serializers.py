@@ -14,9 +14,11 @@ class UserSerializer(serializers.ModelSerializer):
         ]
 
 class MealLogSerializer(serializers.ModelSerializer):
+    scanned_by_username = serializers.CharField(source='scanned_by.username', read_only=True)
+
     class Meta:
         model = MealLog
-        fields = ['id', 'user', 'meal_type', 'consumed_at']
+        fields = ['id', 'user', 'meal_type', 'consumed_at', 'scanned_by_username']
 
 class DrinkTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,7 +29,8 @@ class DrinkTypeSerializer(serializers.ModelSerializer):
 class DrinkTransactionSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.full_name', read_only=True)
     drink_name = serializers.CharField(source='drink_type.name', read_only=True)
+    scanned_by_username = serializers.CharField(source='scanned_by.username', read_only=True)
     
     class Meta:
         model = DrinkTransaction
-        fields = ['id', 'user_name', 'drink_name', 'quantity', 'serving_point', 'status', 'served_at', 'approved_at']
+        fields = ['id', 'user_name', 'drink_name', 'quantity', 'serving_point', 'status', 'served_at', 'approved_at', 'scanned_by_username']

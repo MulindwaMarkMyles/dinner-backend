@@ -1,7 +1,9 @@
 from datetime import timedelta
 
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import Group, User as AuthUser
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -13,6 +15,11 @@ from .models import DrinkTransaction, DrinkType, MealLog, User
 
 def is_admin(user):
     return user.is_staff or user.is_superuser
+
+
+def ensure_api_scanner_group():
+    group, _ = Group.objects.get_or_create(name="API_SCANNER_ADMIN")
+    return group
 
 
 def custom_admin_login(request):
@@ -150,7 +157,10 @@ def approve_order(request, order_id):
 
         # Create meal log
         MealLog.objects.create(
-            user=user, meal_type="drink", serving_point=order.serving_point
+            user=user,
+            meal_type="drink",
+            serving_point=order.serving_point,
+            scanned_by=order.scanned_by,
         )
 
     return redirect("admin_approvals")
@@ -202,8 +212,49 @@ def delete_user(request, user_id):
 @login_required
 @user_passes_test(is_admin)
 def meal_logs(request):
-    logs = MealLog.objects.select_related("user").order_by("-consumed_at")[:100]
+    logs = MealLog.objects.select_related("user", "scanned_by").order_by("-consumed_at")[:100]
     return render(request, "admin_meal_logs.html", {"meal_logs": logs})
+
+
+@login_required
+@user_passes_test(is_admin)
+def admin_api_admins(request):
+    scanner_group = ensure_api_scanner_group()
+
+    if request.method == "POST":
+        username = (request.POST.get("username") or "").strip()
+        password = (request.POST.get("password") or "").strip()
+        first_name = (request.POST.get("first_name") or "").strip()
+        last_name = (request.POST.get("last_name") or "").strip()
+
+        if not username or not password:
+            messages.error(request, "Username and password are required.")
+            return redirect("admin_api_admins")
+
+        if AuthUser.objects.filter(username=username).exists():
+            messages.error(request, "Username already exists.")
+            return redirect("admin_api_admins")
+
+        api_admin = AuthUser.objects.create_user(
+            username=username,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            is_active=True,
+        )
+        api_admin.groups.add(scanner_group)
+        messages.success(request, f"API admin '{username}' created successfully.")
+        return redirect("admin_api_admins")
+
+    api_admins = (
+        AuthUser.objects.filter(groups=scanner_group)
+        .order_by("-date_joined")
+    )
+    return render(
+        request,
+        "admin_api_admins.html",
+        {"api_admins": api_admins},
+    )
 
 
 @login_required

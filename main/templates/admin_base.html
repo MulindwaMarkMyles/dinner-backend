@@ -216,6 +216,14 @@
                 </li>
                 <li>
                     <a
+                        href="{% url 'admin_api_admins' %}"
+                        class="{% if request.resolver_match.url_name == 'admin_api_admins' %}active{% endif %}"
+                    >
+                        <i class="bi bi-person-badge"></i> Admins
+                    </a>
+                </li>
+                <li>
+                    <a
                         href="{% url 'meal_logs' %}"
                         class="{% if request.resolver_match.url_name == 'meal_logs' %}active{% endif %}"
                     >
@@ -244,6 +252,15 @@
 
         <header>DISCON 101 Digital System</header>
         <main class="main-content" style="color: var(--primary-blue)">
+            {% if messages %}
+            <div class="mb-3">
+                {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} mb-2" role="alert">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </main>
 
