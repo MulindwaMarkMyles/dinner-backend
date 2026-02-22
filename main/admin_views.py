@@ -196,6 +196,14 @@ def edit_user(request, user_id):
             request.POST.get("dinners", user.dinners_remaining)
         )
         user.drinks_remaining = int(request.POST.get("drinks", user.drinks_remaining))
+        raw_ticket_id = (request.POST.get("ticket_id") or "").strip()
+        if raw_ticket_id:
+            import uuid as _uuid
+            try:
+                user.ticket_id = _uuid.UUID(raw_ticket_id)
+            except ValueError:
+                messages.error(request, "Invalid ticket ID format — must be a valid UUID.")
+                return redirect("admin_users")
         user.save()
         return redirect("admin_users")
     return render(request, "admin_users.html", {"edit_user": user})

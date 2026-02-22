@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import User as AuthUser
@@ -7,9 +8,9 @@ from django.utils import timezone
 
 # Create your models here.
 class User(models.Model):
-    WEEKLY_LUNCHES = 3
+    WEEKLY_LUNCHES = 1
     WEEKLY_DINNERS = 3
-    WEEKLY_DRINKS = 15
+    WEEKLY_DRINKS = 1
 
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -22,6 +23,7 @@ class User(models.Model):
     dinners_remaining = models.IntegerField(default=WEEKLY_DINNERS)
     drinks_remaining = models.IntegerField(default=WEEKLY_DRINKS)
     rotary_club = models.CharField(max_length=100, null=True, blank=True)
+    ticket_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True, null=True, blank=True)
     delegate_reg_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     external_uuid = models.CharField(max_length=36, null=True, blank=True, db_index=True)
     membership = models.CharField(max_length=20, null=True, blank=True)
