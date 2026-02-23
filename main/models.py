@@ -1,4 +1,3 @@
-import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import User as AuthUser
@@ -9,42 +8,33 @@ from django.utils import timezone
 # Create your models here.
 class User(models.Model):
     WEEKLY_LUNCHES = 1
-    WEEKLY_DINNERS = 3
+    WEEKLY_DINNERS = 0
     WEEKLY_DRINKS = 1
 
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    gender = models.CharField(
-        max_length=10,
-        choices=[("M", "Male"), ("F", "Female"), ("UNKNOWN", "Unknown")],
-        default="UNKNOWN",
-    )
+    # first_name = models.CharField(max_length=100)
+    # last_name = models.CharField(max_length=100)
+    # gender = models.CharField(
+    #     max_length=10,
+    #     choices=[("M", "Male"), ("F", "Female"), ("UNKNOWN", "Unknown")],
+    #     default="UNKNOWN",
+    # )
     lunches_remaining = models.IntegerField(default=WEEKLY_LUNCHES)
     dinners_remaining = models.IntegerField(default=WEEKLY_DINNERS)
     drinks_remaining = models.IntegerField(default=WEEKLY_DRINKS)
-    rotary_club = models.CharField(max_length=100, null=True, blank=True)
-    ticket_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True, null=True, blank=True)
-    delegate_reg_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
-    external_uuid = models.CharField(max_length=36, null=True, blank=True, db_index=True)
-    membership = models.CharField(max_length=20, null=True, blank=True)
-    district = models.CharField(max_length=50, null=True, blank=True)
-    dietary_requirements = models.CharField(max_length=200, null=True, blank=True)
-    has_friday_lunch = models.BooleanField(default=False)
-    has_saturday_lunch = models.BooleanField(default=False)
-    has_bbq = models.BooleanField(default=False)
+    ticket_id = models.CharField(max_length=100, unique=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     week_start = models.DateTimeField(default=timezone.now)
 
-    class Meta:
-        unique_together = ["first_name", "last_name", "gender"]
+    # class Meta:
+    #     unique_together = ["first_name", "last_name", "gender"]
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        return f"{self.ticket_id}"
 
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}"
+    # @property
+    # def full_name(self):
+    #     return f"{self.first_name} {self.last_name}"
 
     @classmethod
     def default_allowances(cls):
@@ -87,7 +77,7 @@ class MealLog(models.Model):
         ordering = ["-consumed_at"]
 
     def __str__(self):
-        return f"{self.user.full_name} - {self.meal_type} - {self.consumed_at}"
+        return f"{self.user.ticket_id} - {self.meal_type} - {self.consumed_at}"
 
 
 class Conversation(models.Model):
@@ -169,4 +159,4 @@ class DrinkTransaction(models.Model):
     approved_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.user.full_name} - {self.drink_type.name} x{self.quantity} at {self.serving_point} [{self.status}]"
+        return f"{self.user.ticket_id} - {self.drink_type.name} x{self.quantity} at {self.serving_point} [{self.status}]"

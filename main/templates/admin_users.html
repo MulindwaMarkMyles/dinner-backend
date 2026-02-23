@@ -13,12 +13,10 @@
                     <tr>
                         <th>ID</th>
                         <th>Ticket ID</th>
-                        <th>Name</th>
-                        <th>Rotary Club</th>
                         <th>Lunches</th>
                         <th>Dinners</th>
                         <th>Drinks</th>
-                        <th>Initial Scan Date</th>
+                        <th>First Scan</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -28,16 +26,14 @@
                         <td>#{{ user.id }}</td>
                         <td>
                             <span class="d-inline-flex align-items-center gap-1">
-                                <code class="small text-muted" title="{{ user.ticket_id }}">{{ user.ticket_id|stringformat:'s'|slice:':8' }}…</code>
+                                <code class="small" title="{{ user.ticket_id }}">{{ user.ticket_id }}</code>
                                 <button type="button" class="btn btn-sm p-0 border-0 text-muted copy-btn"
                                         data-ticket="{{ user.ticket_id }}"
-                                        title="Copy full ticket ID">
+                                        title="Copy ticket ID">
                                     <i class="bi bi-clipboard" style="font-size:.75rem;"></i>
                                 </button>
                             </span>
                         </td>
-                        <td>{{ user.full_name }}</td>
-                        <td>{{ user.rotary_club }}</td>
                         <td>
                             <span class="badge-custom"
                                 >{{ user.lunches_remaining }}/{{user.WEEKLY_LUNCHES }}</span
@@ -53,7 +49,7 @@
                                 >{{ user.drinks_remaining }}/{{user.WEEKLY_DRINKS }}</span
                             >
                         </td>
-                        <td>{{ user.week_start|date:"M d, Y" }}</td>
+                        <td>{{ user.created_at|date:"M d, Y" }}</td>
                         <td>
                             <button
                                 class="btn btn-sm btn-outline-blue"
@@ -64,7 +60,7 @@
                             <a
                                 href="{% url 'delete_user' user.id %}"
                                 class="btn btn-sm btn-outline-danger"
-                                onclick="return confirm('Delete {{ user.full_name }}?')"
+                                onclick="return confirm('Delete ticket {{ user.ticket_id }}?')"
                             >
                                 <i class="bi bi-trash"></i>
                             </a>
@@ -72,7 +68,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="7" class="text-center text-muted py-4">
                             No users found
                         </td>
                     </tr>
@@ -106,13 +102,13 @@
                                 name="ticket_id"
                                 id="editTicketId"
                                 class="form-control font-monospace"
-                                placeholder="Leave blank to keep current"
+                                placeholder="e.g. RMB101-L0245"
                             />
                             <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('editTicketId').value=''" title="Clear">
                                 <i class="bi bi-x"></i>
                             </button>
                         </div>
-                        <div class="form-text">UUID format, e.g. <span class="font-monospace">550e8400-e29b-41d4-a716-446655440000</span></div>
+                        <div class="form-text">Format: <span class="font-monospace">RMB101-L0245</span>. Leave blank to keep current.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Lunches Remaining</label>

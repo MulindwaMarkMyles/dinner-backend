@@ -26,7 +26,7 @@
                 <tbody>
                     {% for log in meal_logs %}
                     <tr>
-                        <td>{{ log.user.full_name }}</td>
+                        <td><code class="small">{{ log.user.ticket_id }}</code></td>
                         <td>
                             <span class="badge-custom text-uppercase small"
                                 >{{ log.get_meal_type_display }}</span

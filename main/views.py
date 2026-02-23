@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -20,64 +18,13 @@ def is_api_scanner(user):
     return user.groups.filter(name="API_SCANNER_ADMIN").exists()
 
 
-def normalize_gender(gender):
-    """Normalize gender input to handle F/M and FEMALE/MALE formats"""
-    if not gender:
-        return "UNKNOWN"
-
-    gender = gender.strip().upper()
-
-    # Map common gender values
-    gender_map = {
-        "FEMALE": "F",
-        "MALE": "M",
-        "F": "F",
-        "M": "M",
-        "UNKNOWN": "UNKNOWN",
-    }
-
-    return gender_map.get(gender, "UNKNOWN")
-
-
-def normalize_name(name):
-    """Normalize names by trimming and collapsing whitespace (preserve titles)."""
-    if not name:
-        return ""
-    return " ".join(name.strip().split())
-
-
-def verify_user_exists(first_name, last_name, gender):
-    """Fast check if user exists in DB only."""
-    normalized_gender = normalize_gender(gender)
-    normalized_first = normalize_name(first_name)
-    normalized_last = normalize_name(last_name)
-    print(
-        f"[verify] raw=({first_name}, {last_name}, {gender}) normalized=({normalized_first}, {normalized_last}, {normalized_gender})"
-    )
-
-    # Check in DB (name-first, then gender match, then name fallback)
-    try:
-        print("[verify] checking DB")
-        users = User.objects.filter(
-            first_name__iexact=normalized_first, last_name__iexact=normalized_last
-        )
-
-        if users.exists():
-            # If we have an exact match with gender, use it
-            user = users.filter(gender__iexact=normalized_gender).first()
-            if user:
-                print("[verify] DB exact match found")
-                return True, user
-            # Otherwise use the first match (name matches, different gender)
-            user = users.first()
-            print("[verify] DB name match found (different gender)")
-            return True, user
-
-        print("[verify] DB miss")
-    except Exception as e:
-        print(f"[verify] DB error: {e}")
-
-    return False, None
+def get_or_create_user_by_ticket(ticket_id):
+    """Get or create a user by their ticket ID."""
+    if not ticket_id:
+        return None
+    ticket_id = str(ticket_id).strip()
+    user, created = User.objects.get_or_create(ticket_id=ticket_id)
+    return user
 
 
 @api_view(["POST"])
@@ -123,13 +70,11 @@ def api_login(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def consume_lunch(request):
-    first_name = request.data.get("first_name")
-    last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
+    ticket_id = request.data.get("ticket_id")
 
-    if not first_name or not last_name or not gender:
+    if not ticket_id:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "ticket_id is required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -139,54 +84,8 @@ def consume_lunch(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    normalized_gender = normalize_gender(gender)
-    normalized_first = normalize_name(first_name)
-    normalized_last = normalize_name(last_name)
-
-    exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
-    )
-    if not exists:
-        return Response(
-            {"error": "User was not found in registry"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    user = existing_user
+    user = get_or_create_user_by_ticket(ticket_id)
     user.reset_weekly_allowance()
-
-    current_day = datetime.now().weekday()
-    has_specific_lunch = user.has_friday_lunch or user.has_saturday_lunch
-
-    if has_specific_lunch:
-        allowed_days = []
-        if user.has_friday_lunch:
-            allowed_days.append("Friday")
-        if user.has_saturday_lunch:
-            allowed_days.append("Saturday")
-
-        is_friday = current_day == 4
-        is_saturday = current_day == 5
-
-        if user.has_friday_lunch and not is_friday:
-            return Response(
-                {"error": "You are only registered for Friday lunch"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if user.has_saturday_lunch and not user.has_friday_lunch and not is_saturday:
-            return Response(
-                {"error": "You are only registered for Saturday lunch"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if user.has_friday_lunch and user.has_saturday_lunch and not (is_friday or is_saturday):
-            return Response(
-                {
-                    "error": f"You are only registered for {' and '.join(allowed_days)} lunch"
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
 
     if user.lunches_remaining <= 0:
         return Response(
@@ -204,13 +103,11 @@ def consume_lunch(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def consume_dinner(request):
-    first_name = request.data.get("first_name")
-    last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
+    ticket_id = request.data.get("ticket_id")
 
-    if not first_name or not last_name or not gender:
+    if not ticket_id:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "ticket_id is required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -220,20 +117,7 @@ def consume_dinner(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    normalized_gender = normalize_gender(gender)
-    normalized_first = normalize_name(first_name)
-    normalized_last = normalize_name(last_name)
-
-    exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
-    )
-    if not exists:
-        return Response(
-            {"error": "User was not found in registry"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    user = existing_user
+    user = get_or_create_user_by_ticket(ticket_id)
     user.reset_weekly_allowance()
 
     if user.dinners_remaining <= 0:
@@ -252,13 +136,11 @@ def consume_dinner(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def consume_bbq(request):
-    first_name = request.data.get("first_name")
-    last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
+    ticket_id = request.data.get("ticket_id")
 
-    if not first_name or not last_name or not gender:
+    if not ticket_id:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "ticket_id is required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -268,27 +150,8 @@ def consume_bbq(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    normalized_gender = normalize_gender(gender)
-    normalized_first = normalize_name(first_name)
-    normalized_last = normalize_name(last_name)
-
-    exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
-    )
-    if not exists:
-        return Response(
-            {"error": "User was not found in registry"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    user = existing_user
+    user = get_or_create_user_by_ticket(ticket_id)
     user.reset_weekly_allowance()
-
-    if not user.has_bbq:
-        return Response(
-            {"error": "User does not have access for BBQ"},
-            status=status.HTTP_403_FORBIDDEN,
-        )
 
     if MealLog.objects.filter(user=user, meal_type="bbq").exists():
         return Response(
@@ -304,15 +167,13 @@ def consume_bbq(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def consume_drink(request):
-    first_name = request.data.get("first_name")
-    last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
+    ticket_id = request.data.get("ticket_id")
     serving_point = request.data.get("serving_point")
     items = request.data.get("items")
 
-    if not first_name or not last_name or not gender:
+    if not ticket_id:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "ticket_id is required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -368,20 +229,7 @@ def consume_drink(request):
         total_requested += quantity
         normalized_items.append({"drink_name": drink_name, "quantity": quantity})
 
-    normalized_gender = normalize_gender(gender)
-    normalized_first = normalize_name(first_name)
-    normalized_last = normalize_name(last_name)
-
-    exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
-    )
-    if not exists:
-        return Response(
-            {"error": "User was not found in registry"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    user = existing_user
+    user = get_or_create_user_by_ticket(ticket_id)
     user.reset_weekly_allowance()
 
     if user.drinks_remaining < total_requested:
@@ -599,29 +447,16 @@ def chatbot_conversations(request):
 
 @api_view(["GET"])
 def get_user_status(request):
-    first_name = request.query_params.get("first_name")
-    last_name = request.query_params.get("last_name")
-    gender = request.query_params.get("gender")
+    ticket_id = request.query_params.get("ticket_id")
 
-    if not first_name or not last_name or not gender:
+    if not ticket_id:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "ticket_id is required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    normalized_first = normalize_name(first_name)
-    normalized_last = normalize_name(last_name)
-    normalized_gender = normalize_gender(gender)
-
     try:
-        users = User.objects.filter(
-            first_name__iexact=normalized_first,
-            last_name__iexact=normalized_last,
-        )
-        if not users.exists():
-            raise User.DoesNotExist
-
-        user = users.filter(gender__iexact=normalized_gender).first() or users.first()
+        user = User.objects.get(ticket_id=ticket_id.strip())
         user.reset_weekly_allowance()
         return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
@@ -683,12 +518,9 @@ def drink_transactions(request):
         transactions = transactions.filter(serving_point__iexact=serving_point)
 
     # Filter by user
-    first_name = request.query_params.get("first_name")
-    last_name = request.query_params.get("last_name")
-    if first_name and last_name:
-        transactions = transactions.filter(
-            user__first_name__iexact=first_name, user__last_name__iexact=last_name
-        )
+    ticket_id = request.query_params.get("ticket_id")
+    if ticket_id:
+        transactions = transactions.filter(user__ticket_id=ticket_id.strip())
 
     return Response(
         DrinkTransactionSerializer(transactions, many=True).data,
