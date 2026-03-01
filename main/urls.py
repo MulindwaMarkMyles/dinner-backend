@@ -16,6 +16,7 @@ urlpatterns = [
         views.drink_transactions,
         name="drink_transactions",
     ),
+    path("main/api/llm/query/", views.llm_query_data, name="llm_query_data"),
     path(
         "administrator/login/",
         admin_views.custom_admin_login,

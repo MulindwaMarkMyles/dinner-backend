@@ -1,15 +1,22 @@
 from datetime import datetime
 
 from django.contrib.auth import authenticate
+from django.db import models as db_models
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import DrinkTransaction, DrinkType, MealLog, User
-from .serializers import DrinkTransactionSerializer, DrinkTypeSerializer, UserSerializer
+from .serializers import (
+    DrinkTransactionSerializer,
+    DrinkTypeSerializer,
+    MealLogSerializer,
+    UserSerializer,
+)
 
 
 def is_api_scanner(user):
@@ -20,25 +27,6 @@ def is_api_scanner(user):
     return user.groups.filter(name="API_SCANNER_ADMIN").exists()
 
 
-def normalize_gender(gender):
-    """Normalize gender input to handle F/M and FEMALE/MALE formats"""
-    if not gender:
-        return "UNKNOWN"
-
-    gender = gender.strip().upper()
-
-    # Map common gender values
-    gender_map = {
-        "FEMALE": "F",
-        "MALE": "M",
-        "F": "F",
-        "M": "M",
-        "UNKNOWN": "UNKNOWN",
-    }
-
-    return gender_map.get(gender, "UNKNOWN")
-
-
 def normalize_name(name):
     """Normalize names by trimming and collapsing whitespace (preserve titles)."""
     if not name:
@@ -46,13 +34,12 @@ def normalize_name(name):
     return " ".join(name.strip().split())
 
 
-def verify_user_exists(first_name, last_name, gender):
+def verify_user_exists(first_name, last_name):
     """Fast check if user exists in DB only."""
-    normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
     print(
-        f"[verify] raw=({first_name}, {last_name}, {gender}) normalized=({normalized_first}, {normalized_last}, {normalized_gender})"
+        f"[verify] raw=({first_name}, {last_name}) normalized=({normalized_first}, {normalized_last})"
     )
 
     # Check in DB (name-first, then gender match, then name fallback)
@@ -64,13 +51,13 @@ def verify_user_exists(first_name, last_name, gender):
 
         if users.exists():
             # If we have an exact match with gender, use it
-            user = users.filter(gender__iexact=normalized_gender).first()
+            user = users.first()
             if user:
                 print("[verify] DB exact match found")
                 return True, user
             # Otherwise use the first match (name matches, different gender)
             user = users.first()
-            print("[verify] DB name match found (different gender)")
+            print("[verify] DB name match found")
             return True, user
 
         print("[verify] DB miss")
@@ -125,11 +112,11 @@ def api_login(request):
 def consume_lunch(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
+    # gender = request.data.get("gender")
 
-    if not first_name or not last_name or not gender:
+    if not first_name or not last_name:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "first_name, last_name are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -139,12 +126,11 @@ def consume_lunch(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
 
     exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
+        normalized_first, normalized_last
     )
     if not exists:
         return Response(
@@ -193,11 +179,28 @@ def consume_lunch(request):
             {"error": "No lunches remaining"}, status=status.HTTP_400_BAD_REQUEST
         )
 
+    # Check if user has already consumed lunch today
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    if MealLog.objects.filter(
+        user=user, meal_type="lunch", consumed_at__gte=today_start
+    ).exists():
+        return Response(
+            {"error": "User has already consumed lunch today"},
+            status=status.HTTP_409_CONFLICT,
+        )
+
     user.lunches_remaining -= 1
     user.save()
     MealLog.objects.create(user=user, meal_type="lunch", scanned_by=request.user)
 
-    return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+    return Response(
+        {
+            "message": "Lunch consumed successfully",
+            "user": UserSerializer(user).data,
+            "lunches_remaining": user.lunches_remaining,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["POST"])
@@ -206,11 +209,10 @@ def consume_lunch(request):
 def consume_dinner(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
 
-    if not first_name or not last_name or not gender:
+    if not first_name or not last_name:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "first_name, last_name are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -220,12 +222,11 @@ def consume_dinner(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
 
     exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
+        normalized_first, normalized_last
     )
     if not exists:
         return Response(
@@ -241,11 +242,28 @@ def consume_dinner(request):
             {"error": "No dinners remaining"}, status=status.HTTP_400_BAD_REQUEST
         )
 
+    # Check if user has already consumed dinner today
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    if MealLog.objects.filter(
+        user=user, meal_type="dinner", consumed_at__gte=today_start
+    ).exists():
+        return Response(
+            {"error": "User has already consumed dinner today"},
+            status=status.HTTP_409_CONFLICT,
+        )
+
     user.dinners_remaining -= 1
     user.save()
     MealLog.objects.create(user=user, meal_type="dinner", scanned_by=request.user)
 
-    return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+    return Response(
+        {
+            "message": "Dinner consumed successfully",
+            "user": UserSerializer(user).data,
+            "dinners_remaining": user.dinners_remaining,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["POST"])
@@ -254,11 +272,10 @@ def consume_dinner(request):
 def consume_bbq(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
 
-    if not first_name or not last_name or not gender:
+    if not first_name or not last_name:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "first_name, last_name are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -268,12 +285,11 @@ def consume_bbq(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
 
     exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
+        normalized_first, normalized_last
     )
     if not exists:
         return Response(
@@ -306,13 +322,12 @@ def consume_bbq(request):
 def consume_drink(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
-    gender = request.data.get("gender")
     serving_point = request.data.get("serving_point")
     items = request.data.get("items")
 
-    if not first_name or not last_name or not gender:
+    if not first_name or not last_name:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "first_name, last_name are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -328,30 +343,23 @@ def consume_drink(request):
         )
 
     if items is None:
-        drink_name = request.data.get("drink_name")
-        quantity = request.data.get("quantity", 1)
-        items = [{"drink_name": drink_name, "quantity": quantity}]
-
-    if not isinstance(items, list) or not items:
         return Response(
-            {"error": "items must be a non-empty list"},
+            {"error": "items is required (e.g. {'Sparkling Water': 2, 'Iced Tea': 1})"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not isinstance(items, dict) or not items:
+        return Response(
+            {"error": "items must be a non-empty object mapping drink names to quantities"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     normalized_items = []
     total_requested = 0
-    for index, item in enumerate(items):
-        if not isinstance(item, dict):
-            return Response(
-                {"error": f"items[{index}] must be an object"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        drink_name = item.get("drink_name")
-        quantity = item.get("quantity", 1)
+    for drink_name, quantity in items.items():
         if not drink_name:
             return Response(
-                {"error": f"items[{index}].drink_name is required"},
+                {"error": "Drink name key must not be empty"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -361,19 +369,18 @@ def consume_drink(request):
                 raise ValueError
         except (TypeError, ValueError):
             return Response(
-                {"error": f"items[{index}].quantity must be a positive integer"},
+                {"error": f"Quantity for '{drink_name}' must be a positive integer"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         total_requested += quantity
         normalized_items.append({"drink_name": drink_name, "quantity": quantity})
 
-    normalized_gender = normalize_gender(gender)
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
 
     exists, existing_user = verify_user_exists(
-        normalized_first, normalized_last, normalized_gender
+        normalized_first, normalized_last
     )
     if not exists:
         return Response(
@@ -384,13 +391,32 @@ def consume_drink(request):
     user = existing_user
     user.reset_weekly_allowance()
 
-    if user.drinks_remaining < total_requested:
+    DAILY_DRINK_LIMIT = 5
+
+    # Count drinks already consumed today (pending + approved)
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    drinks_today = DrinkTransaction.objects.filter(
+        user=user,
+        served_at__gte=today_start,
+        status__in=["pending", "approved"],
+    ).aggregate(total=db_models.Sum("quantity"))["total"] or 0
+
+    drinks_available_today = DAILY_DRINK_LIMIT - drinks_today
+
+    if drinks_available_today <= 0:
+        return Response(
+            {"error": "Daily drink limit of 5 reached"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if total_requested > drinks_available_today:
         return Response(
             {
-                "error": f"Insufficient allowance. Only {user.drinks_remaining} drinks remaining"
+                "error": f"Request exceeds daily limit. You can have at most {drinks_available_today} more drink(s) today"
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
 
     transactions = []
     for item in normalized_items:
@@ -427,6 +453,7 @@ def consume_drink(request):
             "user": UserSerializer(user).data,
             "transactions": DrinkTransactionSerializer(transactions, many=True).data,
             "total_requested": total_requested,
+            "drinks_remaining_today": drinks_available_today - total_requested,
         },
         status=status.HTTP_202_ACCEPTED,
     )
@@ -603,9 +630,9 @@ def get_user_status(request):
     last_name = request.query_params.get("last_name")
     gender = request.query_params.get("gender")
 
-    if not first_name or not last_name or not gender:
+    if not first_name or not last_name:
         return Response(
-            {"error": "first_name, last_name and gender are required"},
+            {"error": "first_name, last_name are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -614,14 +641,10 @@ def get_user_status(request):
     normalized_gender = normalize_gender(gender)
 
     try:
-        users = User.objects.filter(
+        user = User.objects.get(
             first_name__iexact=normalized_first,
             last_name__iexact=normalized_last,
         )
-        if not users.exists():
-            raise User.DoesNotExist
-
-        user = users.filter(gender__iexact=normalized_gender).first() or users.first()
         user.reset_weekly_allowance()
         return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
     except User.DoesNotExist:
@@ -692,5 +715,39 @@ def drink_transactions(request):
 
     return Response(
         DrinkTransactionSerializer(transactions, many=True).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+# @authentication_classes([JWTAuthentication])
+@permission_classes([AllowAny])
+def llm_query_data(request):
+    """
+    Endpoint for LLM to query user meal statuses and logs.
+    Supports optional filtering by first_name and last_name.
+    """
+    first_name = request.query_params.get("first_name")
+    last_name = request.query_params.get("last_name")
+
+    users = User.objects.all()
+    logs = MealLog.objects.all().order_by("-consumed_at")
+
+    if first_name:
+        users = users.filter(first_name__iexact=first_name)
+        logs = logs.filter(user__first_name__iexact=first_name)
+    if last_name:
+        users = users.filter(last_name__iexact=last_name)
+        logs = logs.filter(user__last_name__iexact=last_name)
+
+    # Limit logs to latest 50 if no specific user filter to avoid huge responses
+    if not first_name and not last_name:
+        logs = logs[:50]
+
+    return Response(
+        {
+            "users": UserSerializer(users, many=True).data,
+            "meal_logs": MealLogSerializer(logs, many=True).data,
+        },
         status=status.HTTP_200_OK,
     )

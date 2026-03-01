@@ -8,17 +8,13 @@ from django.utils import timezone
 
 # Create your models here.
 class User(models.Model):
-    WEEKLY_LUNCHES = 1
+    WEEKLY_LUNCHES = 3
     WEEKLY_DINNERS = 3
-    WEEKLY_DRINKS = 1
+    WEEKLY_DRINKS = 15
 
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    gender = models.CharField(
-        max_length=10,
-        choices=[("M", "Male"), ("F", "Female"), ("UNKNOWN", "Unknown")],
-        default="UNKNOWN",
-    )
+    lunches_remaining = models.IntegerField(default=WEEKLY_LUNCHES)
     lunches_remaining = models.IntegerField(default=WEEKLY_LUNCHES)
     dinners_remaining = models.IntegerField(default=WEEKLY_DINNERS)
     drinks_remaining = models.IntegerField(default=WEEKLY_DRINKS)
@@ -37,7 +33,7 @@ class User(models.Model):
     week_start = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = ["first_name", "last_name", "gender"]
+        unique_together = ["first_name", "last_name"]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
