@@ -1,16 +1,16 @@
 from rest_framework import serializers
 from .models import User, MealLog, DrinkType, DrinkTransaction
 
+
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.ReadOnlyField()
     
     class Meta:
         model = User
         fields = [
-            'id', 'ticket_id', 'first_name', 'last_name', 'full_name',
+            'id', 'registration_id', 'external_uuid', 'first_name', 'last_name', 'full_name',
             'lunches_remaining', 'dinners_remaining', 'drinks_remaining',
-            'rotary_club', 'membership', 'delegate_reg_id',
-            'has_friday_lunch', 'has_saturday_lunch', 'has_bbq'
+            'club', 'membership'
         ]
 
 class MealLogSerializer(serializers.ModelSerializer):

@@ -1,4 +1,3 @@
-import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import User as AuthUser
@@ -8,32 +7,31 @@ from django.utils import timezone
 
 # Create your models here.
 class User(models.Model):
-    WEEKLY_LUNCHES = 3
-    WEEKLY_DINNERS = 3
+    WEEKLY_LUNCHES = 4
+    WEEKLY_DINNERS = 4
     WEEKLY_DRINKS = 15
 
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     lunches_remaining = models.IntegerField(default=WEEKLY_LUNCHES)
-    lunches_remaining = models.IntegerField(default=WEEKLY_LUNCHES)
     dinners_remaining = models.IntegerField(default=WEEKLY_DINNERS)
     drinks_remaining = models.IntegerField(default=WEEKLY_DRINKS)
-    rotary_club = models.CharField(max_length=100, null=True, blank=True)
-    ticket_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True, null=True, blank=True)
-    delegate_reg_id = models.CharField(max_length=50, null=True, blank=True, db_index=True)
-    external_uuid = models.CharField(max_length=36, null=True, blank=True, db_index=True)
-    membership = models.CharField(max_length=20, null=True, blank=True)
-    district = models.CharField(max_length=50, null=True, blank=True)
-    dietary_requirements = models.CharField(max_length=200, null=True, blank=True)
-    has_friday_lunch = models.BooleanField(default=False)
-    has_saturday_lunch = models.BooleanField(default=False)
-    has_bbq = models.BooleanField(default=False)
+    club = models.CharField(max_length=120, null=True, blank=True)
+    registration_id = models.CharField(
+        max_length=50, unique=True, null=True, blank=True, db_index=True
+    )
+    external_uuid = models.CharField(
+        max_length=36, unique=True, null=True, blank=True, db_index=True
+    )
+    membership = models.CharField(max_length=50, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     week_start = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        unique_together = ["first_name", "last_name"]
+        indexes = [
+            models.Index(fields=["first_name", "last_name"]),
+        ]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import Group, User as AuthUser
@@ -11,6 +12,55 @@ from django.utils import timezone
 from main.serializers import UserSerializer
 
 from .models import DrinkTransaction, DrinkType, MealLog, User
+
+
+EAST_AFRICA_TIMEZONE = ZoneInfo("Africa/Nairobi")
+
+
+def to_eat(dt):
+    if dt is None:
+        return None
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, EAST_AFRICA_TIMEZONE)
+    return timezone.localtime(dt, EAST_AFRICA_TIMEZONE)
+
+
+def get_eat_now():
+    return to_eat(timezone.now())
+
+
+def get_eat_day_bounds(reference_dt=None):
+    eat_reference = to_eat(reference_dt or timezone.now())
+    day_start = eat_reference.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
+    return day_start, day_end
+
+
+def format_eat_datetime(dt, fmt="%Y-%m-%d %H:%M:%S EAT"):
+    return to_eat(dt).strftime(fmt)
+
+
+def serialize_chat_messages(messages):
+    return [
+        {
+            "role": message.role,
+            "content": message.content,
+            "created_at": format_eat_datetime(message.created_at),
+        }
+        for message in messages
+    ]
+
+
+def serialize_chat_conversations(conversations):
+    return [
+        {
+            "id": conversation.id,
+            "title": conversation.title,
+            "created_at": format_eat_datetime(conversation.created_at),
+            "updated_at": format_eat_datetime(conversation.updated_at),
+        }
+        for conversation in conversations
+    ]
 
 
 def is_admin(user):
@@ -50,19 +100,22 @@ def custom_admin_logout(request):
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(request):
-    today = timezone.now().date()
+    today_start, tomorrow_start = get_eat_day_bounds()
     context = {
         "total_users": User.objects.count(),
         "total_drinks": DrinkType.objects.count(),
-        "pending_orders_count": DrinkTransaction.objects.count(),
-        "total_meals_today": MealLog.objects.filter(consumed_at__date=today).count(),
+        "pending_orders_count": DrinkTransaction.objects.filter(status="pending").count(),
+        "total_meals_today": MealLog.objects.filter(
+            consumed_at__gte=today_start,
+            consumed_at__lt=tomorrow_start,
+        ).count(),
         "recent_orders": DrinkTransaction.objects.select_related(
             "user", "drink_type"
         ).order_by("-served_at")[:5],
         "low_stock_drinks": DrinkType.objects.filter(
             available_quantity__lt=50
         ).order_by("available_quantity"),
-        "current_time": timezone.now(),
+        "current_time": get_eat_now(),
     }
     return render(request, "admin_dashboard.html", context)
 
@@ -196,14 +249,6 @@ def edit_user(request, user_id):
             request.POST.get("dinners", user.dinners_remaining)
         )
         user.drinks_remaining = int(request.POST.get("drinks", user.drinks_remaining))
-        raw_ticket_id = (request.POST.get("ticket_id") or "").strip()
-        if raw_ticket_id:
-            import uuid as _uuid
-            try:
-                user.ticket_id = _uuid.UUID(raw_ticket_id)
-            except ValueError:
-                messages.error(request, "Invalid ticket ID format — must be a valid UUID.")
-                return redirect("admin_users")
         user.save()
         return redirect("admin_users")
     return render(request, "admin_users.html", {"edit_user": user})
@@ -359,7 +404,9 @@ def chatbot_conversation(request, conversation_id=None):
         conversation = get_object_or_404(
             Conversation, id=conversation_id, user=request.user
         )
-        messages = list(conversation.messages.values("role", "content", "created_at"))
+        messages = serialize_chat_messages(
+            conversation.messages.order_by("created_at")
+        )
         return JsonResponse(
             {
                 "conversation_id": conversation.id,
@@ -556,16 +603,16 @@ def _search_users_flexible(name_query: str):
 def _build_smart_context(users_name: str, user_message: str, conversation_history: list = None):
     """Build lean, query-aware context based on what the user is asking"""
     from django.db.models import Count, Sum, Q
-    from django.utils import timezone
 
     from main.models import DrinkTransaction, DrinkType, MealLog, User
 
     intent = _classify_query_intent(user_message, conversation_history)
-    today = timezone.now().date()
+    eat_now = get_eat_now()
+    today_start, tomorrow_start = get_eat_day_bounds(eat_now)
     
     context_parts = [
-        f"SYSTEM DATA (Generated: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')})",
-        f"Current Day: {timezone.now().strftime('%A')}",
+        f"SYSTEM DATA (Generated: {format_eat_datetime(eat_now)})",
+        f"Current Day: {eat_now.strftime('%A')} (EAT)",
         f"Admin User: {users_name}\n"
     ]
     
@@ -573,23 +620,19 @@ def _build_smart_context(users_name: str, user_message: str, conversation_histor
     context_parts.append("=== OVERVIEW ===")
     total_users = User.objects.count()
     context_parts.append(f"Total users: {total_users}")
-    context_parts.append(f"Meals consumed today: {MealLog.objects.filter(consumed_at__date=today).count()}")
+    context_parts.append(
+        "Meals consumed today: "
+        f"{MealLog.objects.filter(consumed_at__gte=today_start, consumed_at__lt=tomorrow_start).count()}"
+    )
     
     # Event registrations (lightweight)
     if intent["needs_stats"] or intent["needs_meal_logs"]:
-        friday_count = User.objects.filter(has_friday_lunch=True).count()
-        saturday_count = User.objects.filter(has_saturday_lunch=True).count()
-        bbq_count = User.objects.filter(has_bbq=True).count()
-        all_meals = User.objects.filter(has_friday_lunch=False, has_saturday_lunch=False).count()
-        context_parts.append(f"Friday lunch registrations: {friday_count}")
-        context_parts.append(f"Saturday lunch registrations: {saturday_count}")
-        context_parts.append(f"BBQ registrations: {bbq_count}")
-        context_parts.append(f"All-meals access users: {all_meals}")
-        
-        # Membership breakdown
         rotary = User.objects.filter(membership='ROTARY').count()
         rotaract = User.objects.filter(membership='ROTARACT').count()
+        guests = User.objects.filter(membership='GUEST').count()
         context_parts.append(f"ROTARY: {rotary}, ROTARACT: {rotaract}")
+        context_parts.append(f"Guests: {guests}")
+        context_parts.append("All imported users currently have access to lunch, dinner, BBQ, and drinks.")
     
     context_parts.append("")
     
@@ -612,7 +655,11 @@ def _build_smart_context(users_name: str, user_message: str, conversation_histor
     if intent["needs_transactions"]:
         context_parts.append("=== DRINK TRANSACTIONS ===")
         pending_count = DrinkTransaction.objects.filter(status="pending").count()
-        approved_today = DrinkTransaction.objects.filter(status="approved", approved_at__date=today).count()
+        approved_today = DrinkTransaction.objects.filter(
+            status="approved",
+            approved_at__gte=today_start,
+            approved_at__lt=tomorrow_start,
+        ).count()
         context_parts.append(f"Pending orders: {pending_count}")
         context_parts.append(f"Approved today: {approved_today}")
         
@@ -641,34 +688,16 @@ def _build_smart_context(users_name: str, user_message: str, conversation_histor
             context_parts.append(f"=== USER FOUND: '{search_name}' ({matched_users.count()} match(es)) ===")
 
             for user in matched_users:
-                # Determine payment/registration status
-                paid_for = []
-                if user.has_friday_lunch:
-                    paid_for.append("Friday Lunch")
-                if user.has_saturday_lunch:
-                    paid_for.append("Saturday Lunch")
-                if user.has_bbq:
-                    paid_for.append("Meat & Greet BBQ")
-
-                if paid_for:
-                    payment_status = f"PAID FOR: {', '.join(paid_for)}"
-                elif user.lunches_remaining > 0 or user.dinners_remaining > 0:
-                    payment_status = "ALL MEALS ACCESS (paid for full package)"
-                else:
-                    payment_status = "DID NOT PAY for any meals (merchandise/registration only)"
-
                 context_parts.append(
                     f"\nName: {user.full_name}\n"
-                    f"Gender: {user.gender}\n"
-                    f"Payment Status: {payment_status}\n"
+                    f"Registration ID: {user.registration_id or 'N/A'}\n"
+                    f"External UUID: {user.external_uuid or 'N/A'}\n"
+                    f"Access: Full event access\n"
                     f"Lunches Remaining: {user.lunches_remaining}\n"
                     f"Dinners Remaining: {user.dinners_remaining}\n"
                     f"Drinks Remaining: {user.drinks_remaining}\n"
-                    f"Club: {user.rotary_club or 'N/A'}\n"
-                    f"Membership: {user.membership or 'N/A'}\n"
-                    f"Friday Lunch: {'Yes' if user.has_friday_lunch else 'No'}\n"
-                    f"Saturday Lunch: {'Yes' if user.has_saturday_lunch else 'No'}\n"
-                    f"BBQ: {'Yes' if user.has_bbq else 'No'}"
+                    f"Club: {user.club or 'N/A'}\n"
+                    f"Membership: {user.membership or 'N/A'}"
                 )
 
         elif intent["needs_specific_user"] and not intent["matched_user_ids"]:
@@ -682,18 +711,11 @@ def _build_smart_context(users_name: str, user_message: str, conversation_histor
             context_parts.append("=== USER SEARCH (Showing 50 users) ===")
             users_list = list(User.objects.all()[:50])
             for user in users_list:
-                flags = []
-                if user.has_friday_lunch:
-                    flags.append("Fri")
-                if user.has_saturday_lunch:
-                    flags.append("Sat")
-                if user.has_bbq:
-                    flags.append("BBQ")
-                flag_str = f" [{','.join(flags)}]" if flags else " [All-Meals]"
                 context_parts.append(
-                    f"  - {user.full_name} ({user.gender}): "
+                    f"  - {user.full_name}: "
                     f"L={user.lunches_remaining}, D={user.dinners_remaining}, "
-                    f"Dk={user.drinks_remaining}, Club={user.rotary_club or 'N/A'}{flag_str}"
+                    f"Dk={user.drinks_remaining}, Club={user.club or 'N/A'}, "
+                    f"Membership={user.membership or 'N/A'}"
                 )
             if total_users > len(users_list):
                 context_parts.append(f"... and {total_users - len(users_list)} more users in database")
@@ -705,13 +727,16 @@ def _build_smart_context(users_name: str, user_message: str, conversation_histor
         logs = MealLog.objects.select_related("user").order_by("-consumed_at")[:20]
         for log in logs:
             context_parts.append(
-                f"  - {log.consumed_at.strftime('%Y-%m-%d %H:%M')} | "
+                f"  - {format_eat_datetime(log.consumed_at, '%Y-%m-%d %H:%M EAT')} | "
                 f"{log.user.full_name}: {log.meal_type}"
                 f"{' at ' + log.serving_point if log.serving_point else ''}"
             )
         
         # Today's breakdown
-        meals_today = MealLog.objects.filter(consumed_at__date=today)
+        meals_today = MealLog.objects.filter(
+            consumed_at__gte=today_start,
+            consumed_at__lt=tomorrow_start,
+        )
         lunch_today = meals_today.filter(meal_type='lunch').count()
         dinner_today = meals_today.filter(meal_type='dinner').count()
         drink_today = meals_today.filter(meal_type='drink').count()
@@ -725,12 +750,11 @@ def _build_smart_context(users_name: str, user_message: str, conversation_histor
     context_parts.append("- Drink inventory and stock levels")
     context_parts.append("- Transaction history and pending orders")
     context_parts.append("- Meal consumption patterns")
-    context_parts.append("- Event statistics (Friday/Saturday lunch, BBQ)")
+    context_parts.append("- Membership and club breakdowns")
     context_parts.append("")
     context_parts.append("IMPORTANT:")
     context_parts.append("- 'How many users registered/scanned?' = Total user count")
-    context_parts.append("- Users with Friday/Saturday flags can ONLY eat lunch on those days")
-    context_parts.append("- Users with NO lunch flags can eat lunch ANY day (paid for all meals)")
-    context_parts.append("- Everyone can access dinner and drinks regardless of lunch restrictions")
+    context_parts.append("- Imported delegates currently have full access to lunch, dinner, BBQ, and drinks")
+    context_parts.append("- Do not infer personal details that are not stored in the app data")
     
     return "\n".join(context_parts)

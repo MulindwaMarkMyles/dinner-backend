@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from django.contrib.auth import authenticate
 from django.db import models as db_models
 from django.utils import timezone
@@ -42,21 +40,18 @@ def verify_user_exists(first_name, last_name):
         f"[verify] raw=({first_name}, {last_name}) normalized=({normalized_first}, {normalized_last})"
     )
 
-    # Check in DB (name-first, then gender match, then name fallback)
     try:
         print("[verify] checking DB")
-        users = User.objects.filter(
-            first_name__iexact=normalized_first, last_name__iexact=normalized_last
+        user = (
+            User.objects.filter(
+                first_name__iexact=normalized_first,
+                last_name__iexact=normalized_last,
+            )
+            .order_by("-updated_at", "-id")
+            .first()
         )
 
-        if users.exists():
-            # If we have an exact match with gender, use it
-            user = users.first()
-            if user:
-                print("[verify] DB exact match found")
-                return True, user
-            # Otherwise use the first match (name matches, different gender)
-            user = users.first()
+        if user:
             print("[verify] DB name match found")
             return True, user
 
@@ -112,7 +107,6 @@ def api_login(request):
 def consume_lunch(request):
     first_name = request.data.get("first_name")
     last_name = request.data.get("last_name")
-    # gender = request.data.get("gender")
 
     if not first_name or not last_name:
         return Response(
@@ -140,39 +134,6 @@ def consume_lunch(request):
 
     user = existing_user
     user.reset_weekly_allowance()
-
-    current_day = datetime.now().weekday()
-    has_specific_lunch = user.has_friday_lunch or user.has_saturday_lunch
-
-    if has_specific_lunch:
-        allowed_days = []
-        if user.has_friday_lunch:
-            allowed_days.append("Friday")
-        if user.has_saturday_lunch:
-            allowed_days.append("Saturday")
-
-        is_friday = current_day == 4
-        is_saturday = current_day == 5
-
-        if user.has_friday_lunch and not is_friday:
-            return Response(
-                {"error": "You are only registered for Friday lunch"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if user.has_saturday_lunch and not user.has_friday_lunch and not is_saturday:
-            return Response(
-                {"error": "You are only registered for Saturday lunch"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if user.has_friday_lunch and user.has_saturday_lunch and not (is_friday or is_saturday):
-            return Response(
-                {
-                    "error": f"You are only registered for {' and '.join(allowed_days)} lunch"
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
 
     if user.lunches_remaining <= 0:
         return Response(
@@ -299,12 +260,6 @@ def consume_bbq(request):
 
     user = existing_user
     user.reset_weekly_allowance()
-
-    if not user.has_bbq:
-        return Response(
-            {"error": "User does not have access for BBQ"},
-            status=status.HTTP_403_FORBIDDEN,
-        )
 
     if MealLog.objects.filter(user=user, meal_type="bbq").exists():
         return Response(
@@ -562,6 +517,7 @@ def chatbot_history(request, conversation_id):
     Returns 200 with:
         conversation_id, title, messages [{role, content, created_at}, ...]
     """
+    from main.admin_views import serialize_chat_messages
     from main.models import Conversation
 
     session_id = request.query_params.get("session_id")
@@ -581,9 +537,7 @@ def chatbot_history(request, conversation_id):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    messages = list(
-        conversation.messages.values("role", "content", "created_at")
-    )
+    messages = serialize_chat_messages(conversation.messages.order_by("created_at"))
     return Response(
         {
             "conversation_id": conversation.id,
@@ -604,6 +558,7 @@ def chatbot_conversations(request):
     Returns 200 with:
         conversations [{id, title, created_at, updated_at}, ...]
     """
+    from main.admin_views import serialize_chat_conversations
     from main.models import Conversation
 
     session_id = request.query_params.get("session_id")
@@ -616,10 +571,10 @@ def chatbot_conversations(request):
     conversations = (
         Conversation.objects.filter(session_id=session_id)
         .order_by("-updated_at")
-        .values("id", "title", "created_at", "updated_at")[:20]
+        [:20]
     )
     return Response(
-        {"conversations": list(conversations)},
+        {"conversations": serialize_chat_conversations(conversations)},
         status=status.HTTP_200_OK,
     )
 
@@ -628,7 +583,6 @@ def chatbot_conversations(request):
 def get_user_status(request):
     first_name = request.query_params.get("first_name")
     last_name = request.query_params.get("last_name")
-    gender = request.query_params.get("gender")
 
     if not first_name or not last_name:
         return Response(
@@ -638,17 +592,20 @@ def get_user_status(request):
 
     normalized_first = normalize_name(first_name)
     normalized_last = normalize_name(last_name)
-    normalized_gender = normalize_gender(gender)
 
-    try:
-        user = User.objects.get(
+    user = (
+        User.objects.filter(
             first_name__iexact=normalized_first,
             last_name__iexact=normalized_last,
         )
-        user.reset_weekly_allowance()
-        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
-    except User.DoesNotExist:
+        .order_by("-updated_at", "-id")
+        .first()
+    )
+    if not user:
         return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    user.reset_weekly_allowance()
+    return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])

@@ -12,13 +12,15 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Ticket ID</th>
+                        <th>Reg ID</th>
+                        <th>UUID</th>
                         <th>Name</th>
-                        <th>Rotary Club</th>
+                        <th>Club</th>
+                        <th>Membership</th>
                         <th>Lunches</th>
                         <th>Dinners</th>
                         <th>Drinks</th>
-                        <th>Initial Scan Date</th>
+                        <th>Access Started</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -26,18 +28,13 @@
                     {% for user in users %}
                     <tr>
                         <td>#{{ user.id }}</td>
+                        <td>{{ user.registration_id|default:"—" }}</td>
                         <td>
-                            <span class="d-inline-flex align-items-center gap-1">
-                                <code class="small text-muted" title="{{ user.ticket_id }}">{{ user.ticket_id|stringformat:'s'|slice:':8' }}…</code>
-                                <button type="button" class="btn btn-sm p-0 border-0 text-muted copy-btn"
-                                        data-ticket="{{ user.ticket_id }}"
-                                        title="Copy full ticket ID">
-                                    <i class="bi bi-clipboard" style="font-size:.75rem;"></i>
-                                </button>
-                            </span>
+                            <code class="small text-muted">{{ user.external_uuid|default:"—" }}</code>
                         </td>
                         <td>{{ user.full_name }}</td>
-                        <td>{{ user.rotary_club }}</td>
+                        <td>{{ user.club|default:"—" }}</td>
+                        <td>{{ user.membership|default:"—" }}</td>
                         <td>
                             <span class="badge-custom"
                                 >{{ user.lunches_remaining }}/{{user.WEEKLY_LUNCHES }}</span
@@ -56,8 +53,11 @@
                         <td>{{ user.week_start|date:"M d, Y" }}</td>
                         <td>
                             <button
-                                class="btn btn-sm btn-outline-blue"
-                                onclick="editUser({{ user.id }}, '{{ user.ticket_id }}', {{ user.lunches_remaining }}, {{ user.dinners_remaining }}, {{ user.drinks_remaining }})"
+                                class="btn btn-sm btn-outline-blue edit-user-btn"
+                                data-user-id="{{ user.id }}"
+                                data-lunches="{{ user.lunches_remaining }}"
+                                data-dinners="{{ user.dinners_remaining }}"
+                                data-drinks="{{ user.drinks_remaining }}"
                             >
                                 <i class="bi bi-pencil"></i> Edit
                             </button>
@@ -72,7 +72,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="11" class="text-center text-muted py-4">
                             No users found
                         </td>
                     </tr>
@@ -98,22 +98,6 @@
             <form method="post" id="editUserForm">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Ticket ID</label>
-                        <div class="input-group">
-                            <input
-                                type="text"
-                                name="ticket_id"
-                                id="editTicketId"
-                                class="form-control font-monospace"
-                                placeholder="Leave blank to keep current"
-                            />
-                            <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('editTicketId').value=''" title="Clear">
-                                <i class="bi bi-x"></i>
-                            </button>
-                        </div>
-                        <div class="form-text">UUID format, e.g. <span class="font-monospace">550e8400-e29b-41d4-a716-446655440000</span></div>
-                    </div>
                     <div class="mb-3">
                         <label class="form-label">Lunches Remaining</label>
                         <input
@@ -164,8 +148,7 @@
 </div>
 
 <script>
-    function editUser(id, ticketId, lunches, dinners, drinks) {
-        document.getElementById("editTicketId").value = ticketId;
+    function editUser(id, lunches, dinners, drinks) {
         document.getElementById("editLunches").value = lunches;
         document.getElementById("editDinners").value = dinners;
         document.getElementById("editDrinks").value = drinks;
@@ -174,14 +157,14 @@
         new bootstrap.Modal(document.getElementById("editUserModal")).show();
     }
 
-    // Copy ticket ID to clipboard
-    document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.copy-btn');
-        if (!btn) return;
-        navigator.clipboard.writeText(btn.dataset.ticket).then(() => {
-            const icon = btn.querySelector('i');
-            icon.className = 'bi bi-clipboard-check text-success';
-            setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 1500);
+    document.querySelectorAll(".edit-user-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+            editUser(
+                button.dataset.userId,
+                button.dataset.lunches,
+                button.dataset.dinners,
+                button.dataset.drinks,
+            );
         });
     });
 </script>

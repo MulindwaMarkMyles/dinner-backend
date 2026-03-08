@@ -3,8 +3,8 @@ from .models import User, MealLog, DrinkType, DrinkTransaction
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ['full_name', 'lunches_remaining', 'dinners_remaining', 'drinks_remaining', 'week_start']
-    search_fields = ['first_name', 'last_name']
+    list_display = ['full_name', 'registration_id', 'club', 'membership', 'lunches_remaining', 'dinners_remaining', 'drinks_remaining', 'week_start']
+    search_fields = ['first_name', 'last_name', 'registration_id', 'external_uuid', 'club']
 
 @admin.register(MealLog)
 class MealLogAdmin(admin.ModelAdmin):

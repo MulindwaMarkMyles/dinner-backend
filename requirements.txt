@@ -7,6 +7,6 @@ django-rest-framework==0.1.0
 djangorestframework==3.16.1
 djangorestframework-simplejwt==5.4.0
 idna==3.11
-openai==1.57.0
+openai
 sqlparse==0.5.5
 urllib3==2.6.3

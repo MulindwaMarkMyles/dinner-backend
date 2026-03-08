@@ -20,7 +20,7 @@
 				<div class="d-flex justify-content-between align-items-start mb-3">
 					<div>
 						<h5 class="mb-1">{{ order.user.full_name }}</h5>
-						<small class="text-muted">{{ order.user.gender }}</small>
+						<small class="text-muted">{{ order.user.club|default:"No club" }}</small>
 					</div>
 					<span class="badge bg-dark-subtle text-dark">Pending</span>
 				</div>

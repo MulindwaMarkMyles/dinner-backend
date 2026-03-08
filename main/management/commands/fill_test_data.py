@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta
+import uuid
 import random
 from main.models import User, MealLog, DrinkType, DrinkTransaction
 
@@ -16,7 +17,8 @@ class Command(BaseCommand):
 	def handle(self, *args, **options):
 		first_names = ["Asha", "Brian", "Clara", "David", "Eve", "Fred"]
 		last_names = ["Kato", "Mirembe", "Stone", "Odongo", "Mugisha", "Tembo"]
-		genders = ["M", "F"]
+		memberships = ["ROTARY", "ROTARACT", "GUEST"]
+		clubs = ["Acacia Sunset", "Kampala Central", "Arua", "Abim", None]
 		meal_points = ["Main Kitchen", "Annex", "Rooftop"]
 		drink_locations = ["Bar", "Cafeteria", "Clubhouse"]
 
@@ -51,8 +53,7 @@ class Command(BaseCommand):
 			while True:
 				first = random.choice(first_names)
 				last = random.choice(last_names)
-				gender = random.choice(genders)
-				key = (first, last, gender)
+				key = (first, last)
 				if key not in used_keys:
 					used_keys.add(key)
 					break
@@ -60,7 +61,10 @@ class Command(BaseCommand):
 			user = User.objects.create(
 				first_name=first,
 				last_name=last,
-				gender=gender,
+				registration_id=str(random.randint(1000, 9999)),
+				external_uuid=str(uuid.uuid4()),
+				membership=random.choice(memberships),
+				club=random.choice(clubs),
 				lunches_remaining=allowances["lunches"],
 				dinners_remaining=allowances["dinners"],
 				drinks_remaining=allowances["drinks"],
