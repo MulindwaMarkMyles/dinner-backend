@@ -430,7 +430,6 @@ def chatbot_send(request):
     Returns 200 with:
         conversation_id, title, message (assistant reply)
     """
-    from main.admin_views import _build_smart_context
     from main.models import ChatMessage, Conversation
     from main.services.ai_service import AIService
 
@@ -474,8 +473,10 @@ def chatbot_send(request):
             if msg.role != "system":
                 messages.append({"role": msg.role, "content": msg.content})
 
-        # Build smart context (same pipeline as admin chatbot)
-        context = _build_smart_context("Guest", user_message, messages)
+        context = (
+            f"Channel: public chatbot. Current server time: "
+            f"{timezone.localtime().strftime('%Y-%m-%d %H:%M:%S %Z')}."
+        )
 
         # Get AI response
         ai_service = AIService()
